@@ -1,0 +1,29 @@
+# Standard published Bedrock on-demand rates, USD per 1M tokens.
+# CONFIRM AGAINST THE LIVE PRICING PAGE THE WEEK OF THE WORKSHOP --
+# these are the rates used for Checkpoint 5's live comparison during the
+# reference build and are illustrative, not a guarantee for event day.
+models:
+  us.anthropic.claude-sonnet-4-6:
+    label: "Claude Sonnet 4.6 (tier-2, default)"
+    input_per_million: 3.00
+    output_per_million: 15.00
+  us.anthropic.claude-opus-4-6-v1:
+    label: "Claude Opus 4.6 (ceiling)"
+    input_per_million: 15.00
+    output_per_million: 75.00
+  us.amazon.nova-lite-v1:0:
+    label: "Amazon Nova Lite (tier-1, cheap)"
+    input_per_million: 0.06
+    output_per_million: 0.24
+    # NOT usable as configured: see checkpoint5-results.md -- fails on
+    # every tool-calling attempt against this harness's Gateway tools,
+    # even the simplest single lookup. Cost per token is moot if it
+    # cannot complete the task at all.
+
+# Non-model costs (per operation), for the full cost panel later:
+gateway:
+  invoke_per_call: 0.000001   # placeholder, confirm against Gateway pricing
+code_interpreter:
+  per_cpu_second: 0.00013     # placeholder, confirm against Code Interpreter pricing
+browser:
+  per_cpu_second: 0.00013     # placeholder, confirm against Browser pricing
