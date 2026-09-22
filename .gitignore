@@ -13,3 +13,4 @@ agentcore/.env.local
 services/mcp_market_data/pypdf/
 services/mcp_market_data/pypdf-*.dist-info/
 services/mcp_market_data/bin/
+services/mcp_market_data/.lock
