@@ -1,0 +1,61 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", sans-serif; background: #0f1115; color: #e6e6e6; }
+
+.login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; }
+.login-form { display: flex; flex-direction: column; gap: 10px; width: 320px; padding: 32px; background: #1a1d24; border-radius: 12px; }
+.login-form h1 { font-size: 18px; margin: 0 0 12px; }
+.login-form label { font-size: 12px; color: #9aa0aa; }
+.login-form input { padding: 8px 10px; border-radius: 6px; border: 1px solid #2c3038; background: #0f1115; color: #e6e6e6; }
+.login-error { color: #ff6b6b; font-size: 13px; }
+
+.app-shell { display: flex; flex-direction: column; height: 100vh; }
+.app-header { display: flex; justify-content: space-between; padding: 12px 20px; background: #1a1d24; border-bottom: 1px solid #2c3038; font-size: 14px; }
+.app-header-user { color: #9aa0aa; }
+
+.app-body { flex: 1; display: flex; overflow: hidden; }
+.chat-column { flex: 1; display: flex; flex-direction: column; padding: 16px; overflow: hidden; }
+.messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+
+.message { padding: 10px 14px; border-radius: 10px; max-width: 70%; white-space: pre-wrap; }
+.message-user { align-self: flex-end; background: #2b5fd9; }
+.message-assistant { align-self: flex-start; background: #22262e; }
+.message-system { align-self: center; background: #402020; color: #ff9a9a; font-size: 13px; }
+
+.composer { display: flex; gap: 8px; }
+.composer input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #2c3038; background: #1a1d24; color: #e6e6e6; }
+
+.btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-confirm { background: #2b5fd9; color: white; }
+.btn-decline { background: #3a3f48; color: #e6e6e6; }
+
+.side-column { width: 280px; padding: 16px; border-left: 1px solid #2c3038; overflow-y: auto; }
+
+.tool-timeline { background: #171a20; border-radius: 8px; padding: 10px; font-size: 12px; }
+.tool-timeline-header { font-weight: 600; margin-bottom: 6px; color: #9aa0aa; }
+.tool-row { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
+.tool-name { color: #7fb0ff; font-family: monospace; }
+.tool-args { color: #7a7f89; font-family: monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+.tool-result-badge { color: #6fcf97; font-size: 11px; }
+.tool-row.running .tool-name::after { content: " …"; }
+
+.comparison-card { background: #171a20; border-radius: 8px; padding: 12px; margin-top: 8px; }
+.comparison-header { font-weight: 600; margin-bottom: 8px; }
+.comparison-card table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.comparison-card th, .comparison-card td { padding: 4px 6px; border-bottom: 1px solid #2c3038; text-align: left; }
+.comparison-card tr.recommended { background: #16321f; }
+.comparison-recommendation { margin-top: 8px; font-size: 13px; color: #6fcf97; }
+
+.cost-panel { background: #171a20; border-radius: 8px; padding: 12px; font-size: 12px; }
+.cost-panel-header { font-weight: 600; margin-bottom: 6px; color: #9aa0aa; }
+.cost-total { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+.cost-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid #2c3038; }
+.cost-model { color: #7fb0ff; }
+.cost-tokens { color: #7a7f89; }
+.cost-usd { font-weight: 600; }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
+.modal { background: #1a1d24; border-radius: 12px; padding: 24px; width: 360px; }
+.modal-title { font-weight: 600; margin-bottom: 10px; }
+.modal-message { margin-bottom: 18px; font-size: 14px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }

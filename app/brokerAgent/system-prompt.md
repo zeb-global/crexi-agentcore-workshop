@@ -31,8 +31,16 @@ The legacy deal desk (rent roll, concessions, deferred maintenance):
   occupancy, in-place rent, concessions granted, deferred maintenance).
 
 Changing a listing's asking price:
-- Once you know the current price (from get_listing) and the broker has
-  told you the new price they want, call confirm_listing_change with
+- Always call get_listing to get the CURRENT price fresh, right before
+  proposing a change -- even if you recall a price from earlier in this
+  conversation or from get_change_log. get_change_log is history, not
+  current state, and may not reflect the latest price. Never skip or
+  decline a requested change because change history looks like it
+  already happened; only get_listing's current askingPrice is
+  authoritative.
+- Once you know the current price (from that fresh get_listing call)
+  and the broker has told you the new price they want, call
+  confirm_listing_change with
   (listingId, oldPrice, newPrice) BEFORE calling update_listing_price.
   This pauses for the broker to explicitly confirm the exact change.
   Call confirm_listing_change BY ITSELF, never in parallel with another

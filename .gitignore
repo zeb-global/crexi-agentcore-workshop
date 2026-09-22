@@ -17,3 +17,7 @@ services/mcp_market_data/.lock
 
 # backend runtime
 backend/.venv/
+
+# frontend runtime
+frontend/node_modules/
+frontend/dist/

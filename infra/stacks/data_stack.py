@@ -95,11 +95,13 @@ class DataStack(Stack):
             log_retention=logs.RetentionDays.ONE_WEEK,
             environment={
                 "LISTINGS_TABLE": self.listings_table.table_name,
+                "CHANGELOG_TABLE": self.changelog_table.table_name,
                 "DOCS_BUCKET": self.docs_bucket.bucket_name,
                 "WORKSHOP_ID": workshop_id,
             },
         )
         self.listings_table.grant_write_data(seed_fn)
+        self.changelog_table.grant_read_write_data(seed_fn)
         self.docs_bucket.grant_write(seed_fn)
 
         provider = cr.Provider(self, "SeedProvider", on_event_handler=seed_fn)

@@ -30,6 +30,20 @@ def on_event(event, context):
             item["version"] = 1
             batch.put_item(Item=item)
 
+    # "Opening state" means the change history too -- a stale changelog
+    # row can mislead the agent into thinking a price change already
+    # happened (a real failure mode this caught: get_change_log showing
+    # an old test write led the model to skip a genuinely new request).
+    if changelog_table_name := os.environ.get("CHANGELOG_TABLE"):
+        changelog = dynamodb.Table(changelog_table_name)
+        for listing in ALL_LISTINGS:
+            resp = changelog.query(
+                KeyConditionExpression=boto3.dynamodb.conditions.Key("listingId").eq(listing["listingId"])
+            )
+            with changelog.batch_writer() as batch:
+                for row in resp.get("Items", []):
+                    batch.delete_item(Key={"listingId": row["listingId"], "changedAt": row["changedAt"]})
+
     s3.put_object(
         Bucket=bucket,
         Key="comps/columbus-multifamily-2025.json",
