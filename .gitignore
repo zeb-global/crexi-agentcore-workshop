@@ -8,3 +8,8 @@ cdk.out/
 agentcore/.env.local
 *.egg-info/
 .DS_Store
+
+# Vendored pure-Python deps (rebuilt by scripts/vendor-deps.sh, not committed)
+services/mcp_market_data/pypdf/
+services/mcp_market_data/pypdf-*.dist-info/
+services/mcp_market_data/bin/

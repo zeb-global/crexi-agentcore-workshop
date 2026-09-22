@@ -1,0 +1,27 @@
+[
+  {
+    "name": "get_change_log",
+    "description": "Recent price/field changes recorded for a listing, with who made each change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "listingId": {"type": "string"},
+        "limit": {"type": "integer"}
+      },
+      "required": ["listingId"]
+    }
+  },
+  {
+    "name": "update_listing_price",
+    "description": "Commit a confirmed price change for a listing. Requires an approvalToken minted by the confirmation step -- this tool will reject the call without one.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "listingId": {"type": "string"},
+        "newPrice": {"type": "number"},
+        "approvalToken": {"type": "string", "description": "Token returned by the confirm_listing_change confirmation step"}
+      },
+      "required": ["listingId", "newPrice", "approvalToken"]
+    }
+  }
+]

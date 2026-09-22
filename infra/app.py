@@ -14,6 +14,7 @@ from stacks.data_stack import DataStack
 from stacks.identity_stack import IdentityStack
 from stacks.legacy_stack import LegacyStack
 from stacks.observability_stack import ObservabilityStack
+from stacks.tools_stack import ToolsStack
 
 WORKSHOP_ID = os.environ.get("WORKSHOP_ID")
 if not WORKSHOP_ID:
@@ -46,6 +47,16 @@ legacy = LegacyStack(
     f"Crexi{WORKSHOP_ID}Legacy",
     workshop_id=WORKSHOP_ID,
     listings_table=data.listings_table,
+    env=env,
+)
+tools = ToolsStack(
+    app,
+    f"Crexi{WORKSHOP_ID}Tools",
+    workshop_id=WORKSHOP_ID,
+    listings_table=data.listings_table,
+    changelog_table=data.changelog_table,
+    approvals_table=data.approvals_table,
+    docs_bucket=data.docs_bucket,
     env=env,
 )
 ObservabilityStack(

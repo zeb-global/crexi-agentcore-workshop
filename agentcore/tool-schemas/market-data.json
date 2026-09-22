@@ -1,0 +1,52 @@
+[
+  {
+    "name": "search_listings",
+    "description": "Search Columbus multi-family listings by market, asset type, unit range, price ceiling, and value-add flag.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "market": {"type": "string", "description": "e.g. columbus-oh"},
+        "assetType": {"type": "string", "description": "e.g. multifamily"},
+        "unitsMin": {"type": "integer"},
+        "unitsMax": {"type": "integer"},
+        "priceMax": {"type": "number"},
+        "valueAdd": {"type": "boolean"}
+      }
+    }
+  },
+  {
+    "name": "get_listing",
+    "description": "Get a single listing by its listingId.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {"listingId": {"type": "string"}},
+      "required": ["listingId"]
+    }
+  },
+  {
+    "name": "get_market_comps",
+    "description": "Recent Columbus multi-family comparable sales and their cap rates.",
+    "inputSchema": {"type": "object", "properties": {}}
+  },
+  {
+    "name": "list_property_documents",
+    "description": "List the PDF documents available for a listing (e.g. T-12 operating statement, offering memorandum).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {"listingId": {"type": "string"}},
+      "required": ["listingId"]
+    }
+  },
+  {
+    "name": "get_document_text",
+    "description": "Extract text from a listing's PDF document. Net operating income (NOI) exists ONLY here, inside the T-12 operating statement -- it is not in any structured field.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "listingId": {"type": "string"},
+        "documentName": {"type": "string", "description": "e.g. T12_2025.pdf or OM.pdf"}
+      },
+      "required": ["listingId", "documentName"]
+    }
+  }
+]
