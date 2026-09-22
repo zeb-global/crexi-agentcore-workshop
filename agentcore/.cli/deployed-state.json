@@ -35,10 +35,19 @@
             "harnessVersion": 2,
             "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:runtime/harness_crexiWorkshopV2_investorAgent-3eOWXK4oD7",
             "provisioner": "cloudformation"
+          },
+          "brokerAgent": {
+            "harnessId": "crexiWorkshopV2_brokerAgent-Zh8tLOhxvX",
+            "harnessArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:harness/crexiWorkshopV2_brokerAgent-Zh8tLOhxvX",
+            "roleArn": "arn:aws:iam::347272280436:role/crexiWorkshopV2_brokerAgent",
+            "status": "READY",
+            "harnessVersion": 1,
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:runtime/harness_crexiWorkshopV2_brokerAgent-47zRMM2rtF",
+            "provisioner": "cloudformation"
           }
         },
         "stackName": "AgentCore-crexiWorkshopV2-default",
-        "deployHash": "5a4fff1dc1800844"
+        "deployHash": "355d74642ec5eb8e"
       }
     }
   }

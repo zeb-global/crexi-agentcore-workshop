@@ -58,6 +58,10 @@
     {
       "name": "investorAgent",
       "path": "app/investorAgent"
+    },
+    {
+      "name": "brokerAgent",
+      "path": "app/brokerAgent"
     }
   ],
   "datasets": [],

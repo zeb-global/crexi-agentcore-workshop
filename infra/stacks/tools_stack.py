@@ -75,7 +75,7 @@ class ToolsStack(Stack):
             },
         )
         listings_table.grant_read_write_data(self.listing_ops_fn)
-        changelog_table.grant_write_data(self.listing_ops_fn)
+        changelog_table.grant_read_write_data(self.listing_ops_fn)
         approvals_table.grant_read_write_data(self.listing_ops_fn)
 
         CfnOutput(self, "MarketDataFunctionArn", value=self.market_data_fn.function_arn)
