@@ -28,9 +28,57 @@
           }
         }
       }
+    },
+    {
+      "type": "agentcore_browser",
+      "name": "browser"
+    },
+    {
+      "type": "inline_function",
+      "name": "confirm_listing_change",
+      "config": {
+        "inlineFunction": {
+          "description": "Ask the signed-in broker to confirm an exact listing price change before it is committed. Call this BEFORE update_listing_price, once you have the old and new price.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "listingId": {
+                "type": "string"
+              },
+              "oldPrice": {
+                "type": "number"
+              },
+              "newPrice": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "listingId",
+              "oldPrice",
+              "newPrice"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "inline_function",
+      "name": "get_legacy_credentials",
+      "config": {
+        "inlineFunction": {
+          "description": "Get the login credentials for the signed-in broker's account on the legacy deal desk (a separate, no-API system reachable only through the browser tool). Call this once, before navigating there with the browser tool.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      }
     }
   ],
   "skills": [],
+  "allowedTools": [
+    "*"
+  ],
   "memory": {
     "mode": "managed",
     "strategies": [
@@ -39,10 +87,5 @@
       "USER_PREFERENCE"
     ],
     "eventExpiryDuration": 30
-  },
-  "allowedTools": [
-    "@market-data/*",
-    "@listing-ops/*",
-    "@builtin/file_operations"
-  ]
+  }
 }

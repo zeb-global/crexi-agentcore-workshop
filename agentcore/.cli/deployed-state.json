@@ -41,13 +41,13 @@
             "harnessArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:harness/crexiWorkshopV2_brokerAgent-Zh8tLOhxvX",
             "roleArn": "arn:aws:iam::347272280436:role/crexiWorkshopV2_brokerAgent",
             "status": "READY",
-            "harnessVersion": 1,
+            "harnessVersion": 5,
             "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:runtime/harness_crexiWorkshopV2_brokerAgent-47zRMM2rtF",
             "provisioner": "cloudformation"
           }
         },
         "stackName": "AgentCore-crexiWorkshopV2-default",
-        "deployHash": "355d74642ec5eb8e"
+        "deployHash": "a4b280d7334a96d1"
       }
     }
   }
