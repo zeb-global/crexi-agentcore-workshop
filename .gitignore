@@ -14,3 +14,6 @@ services/mcp_market_data/pypdf/
 services/mcp_market_data/pypdf-*.dist-info/
 services/mcp_market_data/bin/
 services/mcp_market_data/.lock
+
+# backend runtime
+backend/.venv/

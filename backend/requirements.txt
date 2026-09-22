@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+boto3
+ag-ui-protocol
+sse-starlette
+pyyaml
+python-jose[cryptography]
+python-multipart
+certifi
