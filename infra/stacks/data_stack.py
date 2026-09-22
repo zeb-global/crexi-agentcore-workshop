@@ -52,6 +52,23 @@ class DataStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
+        # ---- DynamoDB: approval tokens ------------------------------------------
+        # Minted by the backend (which knows the real, validated Cognito
+        # identity) after a broker confirms a price change. The listing-ops
+        # MCP tool validates a token exists, is unexpired and unused, and
+        # matches the exact write being attempted -- see
+        # services/mcp_listing_ops/handler.py for why this exists instead
+        # of trusting a model-supplied actor argument.
+        self.approvals_table = dynamodb.Table(
+            self,
+            "ApprovalsTable",
+            table_name=f"crexi-{workshop_id}-approvals",
+            partition_key=dynamodb.Attribute(name="approvalToken", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+            time_to_live_attribute="expiresAt",
+        )
+
         # ---- S3: documents, comps, artifacts -----------------------------------
         self.docs_bucket = s3.Bucket(
             self,
