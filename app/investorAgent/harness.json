@@ -4,36 +4,7 @@
     "provider": "bedrock",
     "modelId": "us.anthropic.claude-sonnet-4-6"
   },
-  "tools": [
-    {
-      "type": "agentcore_gateway",
-      "name": "market-data",
-      "config": {
-        "agentCoreGateway": {
-          "gatewayArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:gateway/crexiworkshopv2-gw-readonly-dev01-zbqpufxu0p",
-          "outboundAuth": {
-            "awsIam": {}
-          }
-        }
-      }
-    },
-    {
-      "type": "agentcore_code_interpreter",
-      "name": "code-interpreter"
-    }
-  ],
+  "tools": [],
   "skills": [],
-  "allowedTools": [
-    "@market-data/*",
-    "@code-interpreter"
-  ],
-  "memory": {
-    "mode": "managed",
-    "strategies": [
-      "SEMANTIC",
-      "SUMMARIZATION",
-      "USER_PREFERENCE"
-    ],
-    "eventExpiryDuration": 30
-  }
+  "allowedTools": []
 }
