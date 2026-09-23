@@ -1,5 +1,5 @@
 <title>Workshop Walkthrough</title>
-<meta name="description" content="Step-by-step checkpoint guide for the CREXi AgentCore Workshop, with the exact fields to fill in and the reference answer for each.">
+<meta name="description" content="Learn AgentCore Harness by building two real agents, step by step, with the exact fields to fill in and the reference answer for each.">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Serif:ital@1&display=swap');
 
@@ -200,14 +200,14 @@ footer.done h2{color:var(--d-text); font-size:26px; margin:0 0 20px;}
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" stroke="#CEF79F" stroke-width="2.2" stroke-linecap="round"/></svg>
       Workshop Walkthrough
     </div>
-    <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="tocNav">Checkpoints</button>
+    <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="tocNav">Sections</button>
     <nav class="toc" id="tocNav">
-      <a href="#cp0">0 &middot; Env</a>
-      <a href="#cp1">1 &middot; Investor</a>
-      <a href="#cp2">2 &middot; Underwriting</a>
-      <a href="#cp3">3 &middot; Broker</a>
+      <a href="#cp0">Setup</a>
+      <a href="#cp1">1 &middot; Investor agent</a>
+      <a href="#cp2">2 &middot; Real math</a>
+      <a href="#cp3">3 &middot; Second agent</a>
       <a href="#cp4">4 &middot; Legacy desk</a>
-      <a href="#cp5">5 &middot; Model cost</a>
+      <a href="#cp5">5 &middot; Swap models</a>
       <a href="#demo">Export</a>
       <a href="#done">Checklist</a>
     </nav>
@@ -217,13 +217,13 @@ footer.done h2{color:var(--d-text); font-size:26px; margin:0 0 20px;}
 <div class="hero">
   <div class="hero-inner">
     <p class="overline">CREXi AgentCore Workshop</p>
-    <h1>The reference build, walked through checkpoint by checkpoint</h1>
-    <p class="lead">Six checkpoints, about 2 hours 20 minutes hands-on. Each one names the exact file and field
-      you fill in, how to fill it, and the verified reference answer, so you can check your own work without
-      guessing whether it is right.</p>
+    <h1>Learn AgentCore Harness by building two real agents</h1>
+    <p class="lead">Five build steps, about 2 hours 20 minutes hands-on. Each one names the exact file and field
+      you fill in, what it teaches you about how Harness actually works, and the verified reference answer, so
+      you can check your own work without guessing whether it is right.</p>
     <div class="hero-meta">
       <span class="chip"><b>~2h 20m</b> hands-on</span>
-      <span class="chip"><b>6</b> checkpoints</span>
+      <span class="chip"><b>5</b> build steps</span>
       <span class="chip"><b>2</b> agents built</span>
       <span class="chip">on the <b>participant-exercise</b> branch</span>
     </div>
@@ -245,33 +245,33 @@ footer.done h2{color:var(--d-text); font-size:26px; margin:0 0 20px;}
       <code>app/brokerAgent/harness.json</code>, <code>app/brokerAgent/system-prompt.md</code>, <code>backend/confirmation.py</code>,
       and <code>backend/pricing.yaml</code>. Everything else &mdash; <code>agentcore/</code>, <code>infra/</code>, <code>services/</code>, <code>frontend/</code>
       &mdash; is pre-built. If a step seems to need touching anything else, re-read it; ask a facilitator before you do.</p>
-      <p>Each checkpoint gives you the field, what it means, and how to reason your way to the value. Try that
-      first. The green <b>reveal the answer</b> panel underneath is the verified reference content &mdash; open it
-      to check your work or to unstick yourself, not as the first move.</p>
+      <p>Each step gives you the field, what it means, and what it's teaching you about how Harness works. Try
+      that first. The green <b>reveal the answer</b> panel underneath is the verified reference content &mdash;
+      open it to check your work or to unstick yourself, not as the first move.</p>
     </div>
   </section>
 
-  <!-- ================= CHECKPOINT 0 ================= -->
+  <!-- ================= SETUP ================= -->
   <section class="checkpoint" id="cp0">
     <div class="cp-head">
-      <div class="cp-num">0</div>
+      <div class="cp-num" style="font-size:13px;">Setup</div>
       <div class="cp-title-wrap">
-        <h2>Environment up</h2>
-        <p class="cp-sub">Get a stub deployment running end to end before touching any agent config.</p>
+        <h2>Get your environment running</h2>
+        <p class="cp-sub">Deploy a working stub end to end before touching any agent config.</p>
       </div>
     </div>
     <div class="cp-meta">
       <span class="tag time">15 min</span>
       <span class="tag">no files &mdash; setup only</span>
-      <span class="tag">AgentCore surface: none yet</span>
     </div>
 
     <div class="step">
       <h3><span class="step-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#CEF79F" stroke-width="2.4" stroke-linecap="round"/></svg></span>What you're doing</h3>
-      <p>On the <code>participant-exercise</code> branch, both harnesses already deploy &mdash; they're just dumb
-      stubs (a name, a model, no tools, no memory). The goal here is only to prove your own environment and AWS
-      account work: deploy the stub, open the chat UI, get a plain reply with no personalization and no tools.
-      Everything from Checkpoint 1 onward builds this stub up into the real agent.</p>
+      <p>A Harness is just a config file plus a system prompt &mdash; there's no agent loop to write. Both
+      harnesses in this repo already deploy, right now, as dumb stubs (a name, a model, no tools, no memory). The
+      goal here is only to prove your own environment and AWS account work: deploy the stub, open the chat UI,
+      get a plain reply with no personalization and no tools. The next five steps build this same stub up into a
+      real agent, one piece of Harness config at a time.</p>
     </div>
 
     <div class="filelabel">terminal</div>
@@ -314,8 +314,8 @@ for username in ('dana', 'marcus'):
     <div class="cp-head">
       <div class="cp-num">1</div>
       <div class="cp-title-wrap">
-        <h2>The investor agent</h2>
-        <p class="cp-sub">Turn the stub into an agent that reads real data and remembers Dana between sessions.</p>
+        <h2>Build your first Harness: the investor agent</h2>
+        <p class="cp-sub">Configure a model, a tool, and memory, and turn the stub into an agent that reads real data and remembers Dana between sessions.</p>
       </div>
     </div>
     <div class="cp-meta">
@@ -377,12 +377,12 @@ for username in ('dana', 'marcus'):
 
     <div class="step">
       <h3><span class="step-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#CEF79F" stroke-width="2.4" stroke-linecap="round"/></svg></span>Step 3 &middot; Set allowedTools</h3>
-      <p>Set <code>allowedTools</code> to <code>["@market-data/*"]</code> for now (Checkpoint 2 adds one more
+      <p>Set <code>allowedTools</code> to <code>["@market-data/*"]</code> for now (the next step adds one more
       entry). Note the <code>@</code> prefix and the trailing <code>/*</code> glob &mdash; both matter.</p>
       <div class="why"><b>Why the @ prefix</b>A bare tool name in <code>allowedTools</code> only matches AWS's
         fixed <em>built-in</em> tool identifiers. <code>market-data</code> is a custom-named Gateway tool from the
         harness author's own perspective, so it must be referenced as <code>@market-data/*</code> &mdash; the same
-        way Checkpoint 2's <code>code-interpreter</code> tool needs <code>@code-interpreter</code>, not a bare
+        way the next step's <code>code-interpreter</code> tool needs <code>@code-interpreter</code>, not a bare
         name. Getting this wrong doesn't error at deploy time; it silently rejects every call with
         "Unknown tool" at runtime, which is a much harder bug to trace back to one missing character.</div>
       <details class="answer">
@@ -403,7 +403,7 @@ for username in ('dana', 'marcus'):
       stored criteria without asking them to repeat it; and to be proactive &mdash; call the tools immediately
       once intent is clear, rather than asking permission to search.</p>
       <details class="answer">
-        <summary><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#1F6E4A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Reveal the answer &mdash; Checkpoint 1's part of system-prompt.md</summary>
+        <summary><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#1F6E4A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Reveal the answer &mdash; this step's part of system-prompt.md</summary>
         <div class="answer-body">
           <div class="filelabel">app/investorAgent/system-prompt.md</div>
           <pre><code>You are CREXi's investor-facing assistant for commercial real estate. You help
@@ -431,8 +431,8 @@ Grounding rules:
 Style:
 - Be concise and specific to the user's stated or stored market and
   criteria. Plain, professional text. No emojis or decorative symbols.</code></pre>
-          <p style="font-size:13px; color:var(--l-muted); margin-top:10px;">Checkpoint 2 appends an
-          "Underwriting" section below this &mdash; see that checkpoint for the rest.</p>
+          <p style="font-size:13px; color:var(--l-muted); margin-top:10px;">The next step (real underwriting math)
+          appends an "Underwriting" section below this &mdash; see that step for the rest.</p>
         </div>
       </details>
     </div>
@@ -450,8 +450,8 @@ Style:
     <div class="cp-head">
       <div class="cp-num">2</div>
       <div class="cp-title-wrap">
-        <h2>Federated answer, real arithmetic</h2>
-        <p class="cp-sub">Assemble one answer from three disconnected sources, then run the math for real.</p>
+        <h2>Give it real tools for real math</h2>
+        <p class="cp-sub">Assemble one answer from three disconnected sources, then run the math through a Harness tool, not the model.</p>
       </div>
     </div>
     <div class="cp-meta">
@@ -465,11 +465,11 @@ Style:
       <h3><span class="step-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#CEF79F" stroke-width="2.4" stroke-linecap="round"/></svg></span>Step 1 &middot; Attach Code Interpreter</h3>
       <p>Add a second tool: <code>type: "agentcore_code_interpreter"</code>, <code>name: "code-interpreter"</code>.
       No gateway, no ARN &mdash; this one's a first-class AgentCore tool type, not a Lambda behind a Gateway. Then
-      add <code>"@code-interpreter"</code> to <code>allowedTools</code> alongside last checkpoint's entry.</p>
+      add <code>"@code-interpreter"</code> to <code>allowedTools</code> alongside the previous step's entry.</p>
       <details class="answer">
         <summary><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#1F6E4A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Reveal the answer &mdash; the finished harness.json</summary>
         <div class="answer-body">
-          <div class="filelabel">app/investorAgent/harness.json &mdash; complete, end of Checkpoint 2</div>
+          <div class="filelabel">app/investorAgent/harness.json &mdash; complete, after this step</div>
           <pre><code>{
   "name": "investorAgent",
   "model": { "provider": "bedrock", "modelId": "us.anthropic.claude-sonnet-4-6" },
@@ -495,7 +495,7 @@ Style:
 
     <div class="step">
       <h3><span class="step-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="#CEF79F" stroke-width="2.2" stroke-linecap="round"/></svg></span>Step 2 &middot; Teach it where NOI lives, and that it must not do the math itself</h3>
-      <p>This is the crux of the checkpoint. Net operating income exists <em>only</em> inside each listing's T-12
+      <p>This is the crux of this step. Net operating income exists <em>only</em> inside each listing's T-12
       operating statement PDF &mdash; it is not a field on the listing, and the model must never estimate it. It
       has to call <code>get_document_text(listingId, "T12_2025.pdf")</code>. And once it has
       <code>(name, listingId, units, askingPrice, noi)</code> for every candidate, it must not calculate cap rate,
@@ -558,7 +558,7 @@ Style:
     <div class="cp-head">
       <div class="cp-num">3</div>
       <div class="cp-title-wrap">
-        <h2>Second agent, real isolation</h2>
+        <h2>Add a second agent, and prove it's really isolated</h2>
         <p class="cp-sub">Give the broker agent its own gateways, then watch two isolation violations actually fail.</p>
       </div>
     </div>
@@ -570,14 +570,14 @@ Style:
 
     <div class="step">
       <h3><span class="step-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#CEF79F" stroke-width="2.4" stroke-linecap="round"/></svg></span>Step 1 &middot; Attach both gateways and memory</h3>
-      <p>Mirror Checkpoint 1's <code>market-data</code> gateway block into brokerAgent's harness.json (same
+      <p>Mirror the investor agent's <code>market-data</code> gateway block into brokerAgent's harness.json (same
       shape), then add a second gateway tool: <code>name: "listing-ops"</code>, pointing at the <code>gw-ops</code>
       gateway &mdash; the write-capable one, already deployed with an approval-token-gated Lambda behind it. Add
       the same managed-memory block as investor's.</p>
       <div class="watchout"><b>Both harnesses are already registered.</b> Unlike the original plan, you don't run
         <code>agentcore add harness</code> here &mdash; <code>brokerAgent</code> has been deployed as a stub since
-        Checkpoint 0, because this repo's per-participant render pipeline deploys both harnesses together on
-        every bootstrap. Your work this checkpoint is entirely inside its <code>harness.json</code>.</div>
+        the setup step, because this repo's per-participant render pipeline deploys both harnesses together on
+        every bootstrap. Your work here is entirely inside its <code>harness.json</code>.</div>
       <details class="answer">
         <summary><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#1F6E4A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Reveal the answer &mdash; both gateway blocks</summary>
         <div class="answer-body">
@@ -598,8 +598,8 @@ Style:
 
     <div class="step">
       <h3><span class="step-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#CEF79F" stroke-width="2.4" stroke-linecap="round"/></svg></span>Step 2 &middot; Set allowedTools to everything</h3>
-      <p>Set <code>allowedTools</code> to <code>["*"]</code>. Broker ends up with several tool types by
-      Checkpoint 4 (two gateways, a browser, two inline functions) and there's no isolation benefit to enumerating
+      <p>Set <code>allowedTools</code> to <code>["*"]</code>. Broker ends up with several tool types by the
+      next step (two gateways, a browser, two inline functions) and there's no isolation benefit to enumerating
       each one by name the way investor did &mdash; the wildcard is the reference answer here, not a shortcut.</p>
       <details class="answer">
         <summary><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#1F6E4A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Reveal the answer</summary>
@@ -636,7 +636,7 @@ Style:
       <div class="cp-num">4</div>
       <div class="cp-title-wrap">
         <h2>Go get what has no API, then write through the one that does</h2>
-        <p class="cp-sub">The checkpoint everything else in the day protects the time for.</p>
+        <p class="cp-sub">The step everything else in the day protects the time for.</p>
       </div>
     </div>
     <div class="cp-meta">
@@ -819,7 +819,7 @@ def mint_price_change_approval(actor: str, listing_id: str, old_price: int, new_
     <div class="step">
       <h3><span class="step-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="#CEF79F" stroke-width="2.2" stroke-linecap="round"/></svg></span>Fill in the real per-token rates</h3>
       <p><code>backend/harness_client.py</code> already supports invoke-time model overrides &mdash; that part is
-      pre-built, nothing to write there. Your one file this checkpoint is <code>pricing.yaml</code>: fill in the
+      pre-built, nothing to write there. Your one file this step is <code>pricing.yaml</code>: fill in the
       published Bedrock on-demand rate (USD per 1 million tokens, input and output) for each of the three models,
       so the cost panel shows real dollars instead of zero.</p>
       <div class="watchout"><b>Confirm against the live pricing page.</b> Rates change; the numbers below are
@@ -839,7 +839,7 @@ def mint_price_change_approval(actor: str, listing_id: str, old_price: int, new_
 
     <div class="step">
       <h3><span class="step-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21a8 8 0 0 1 16 0" stroke="#CEF79F" stroke-width="2.2" stroke-linecap="round"/></svg></span>Run the comparison, then check against these verified numbers</h3>
-      <p>Re-run the Checkpoint 2 scenario three times, overriding the model at invoke time (no redeploy needed):</p>
+      <p>Re-run the underwriting scenario from earlier three times, overriding the model at invoke time (no redeploy needed):</p>
       <table class="figures">
         <tr><th>Model</th><th>Result</th><th>Cost</th></tr>
         <tr><td>Nova Lite (tier-1)</td><td>Hard failure on every tool-calling attempt &mdash; a real, reproducible <code>modelStreamErrorException</code></td><td>moot &mdash; it never completes</td></tr>
@@ -869,7 +869,7 @@ def mint_price_change_approval(actor: str, listing_id: str, old_price: int, new_
       MCP client setup, a Code Interpreter wrapper, and the full system prompt carried over verbatim. This is the
       agent loop you never had to write, now as code you own.</p>
       <p>Then the fork this creates: the managed Harness loop <b>cannot be interrupted mid-run</b>. For a
-      confirmation step like Checkpoint 4's, that's fine &mdash; the pause is a designed part of the loop. For a
+      confirmation step like the broker's price-change flow, that's fine &mdash; the pause is a designed part of the loop. For a
       persistent, site-wide assistant that needs to be stoppable at any point in an arbitrary long-running task,
       that's the exact moment a team reaches for the exported Strands code instead of the managed Harness.</p>
       <div class="watchout"><b>Read the export notes.</b> Every export produces an <code>EXPORT_NOTES.md</code>
