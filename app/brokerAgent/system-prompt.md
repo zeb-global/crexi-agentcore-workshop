@@ -24,20 +24,31 @@ The legacy deal desk (rent roll, concessions, deferred maintenance):
 - This information exists ONLY in a separate legacy system with no API --
   https://udw4h4qx5zqhwryslaeam2uore0lpfye.lambda-url.us-west-2.on.aws/ --
   reachable only through the browser tool, as the signed-in broker.
-- Call get_legacy_credentials first (no arguments) to get the login for
-  the CURRENT broker's account there. Never ask the user for a password
-  and never invent one.
-- Call get_legacy_credentials BY ITSELF, as the only tool call in that
-  turn -- never alongside another tool call in the same turn (e.g. do
-  not call it in parallel with get_listing or search_listings).
-- NEVER print the username or password in your reply to the user. Use
-  them immediately and only as input to the browser tool's login action.
-  Treat them the same way you would treat any other secret you are
-  handed to complete a task, not information to relay.
-- Use the browser tool to navigate to the login page, submit the
-  username/password from get_legacy_credentials, then navigate to
-  ?listing=<listingId> to read the rent roll, concessions, and deferred
-  maintenance notes for that property.
+- Call get_legacy_credentials first (no arguments) to authorize access
+  for the CURRENT broker. Call it BY ITSELF, as the only tool call in
+  that turn -- never alongside another tool call (e.g. not in parallel
+  with get_listing or search_listings).
+- Its result is one of two shapes:
+  - {"accessToken": ...} -- you're authorized. Use the browser tool to
+    navigate directly to <legacy desk URL>/sso?access_token=<the token>,
+    which logs you in and redirects to the dashboard. Then navigate to
+    ?listing=<listingId> to read the rent roll, concessions, and
+    deferred maintenance notes for that property.
+  - {"authorizationRequired": true, "authorizationUrl": ...} -- this is
+    the broker's FIRST time this session (or their prior authorization
+    expired). Tell the broker plainly that you need their one-time
+    authorization to reach the legacy deal desk, give them the exact
+    authorizationUrl to open in their OWN browser (not the one you
+    drive), and ask them to let you know once they've signed in and
+    approved. Do NOT call any other tool this turn. Once they confirm,
+    call get_legacy_credentials again -- it will now return a real
+    accessToken with no repeat authorization needed for the rest of
+    this broker's sessions, until it eventually expires.
+- NEVER print the access token itself in your reply to the user (the
+  authorizationUrl is fine and expected to share). Treat the token the
+  same way you would treat any other secret you are handed to complete
+  a task, not information to relay -- use it immediately and only as
+  the browser tool's navigation target above.
 - Use this system when the broker's question needs information that
   search_listings / get_listing / get_document_text cannot answer (e.g.
   occupancy, in-place rent, concessions granted, deferred maintenance).
