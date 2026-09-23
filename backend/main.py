@@ -9,10 +9,17 @@ persist it (e.g. DynamoDB) so a restart doesn't strand a pending run.
 """
 import json
 import logging
+import re
 import time
 import uuid
 
-from ag_ui.core import Interrupt, RunFinishedEvent, RunFinishedInterruptOutcome
+from ag_ui.core import (
+    Interrupt,
+    RunFinishedEvent,
+    RunFinishedInterruptOutcome,
+    RunFinishedSuccessOutcome,
+    StateDeltaEvent,
+)
 from ag_ui.encoder import EventEncoder
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +49,23 @@ _encoder = EventEncoder()
 #            "listing_id", "old_price", "new_price"}
 # Populated when a run pauses on confirm_listing_change; consumed on resume.
 _paused_runs: dict[str, dict] = {}
+
+# Catches a model that answers an underwriting-style comparison in plain
+# prose without ever calling code-interpreter or submit_underwriting_result
+# at all -- the submit_underwriting_result gate only fires if the model
+# actually calls it, which is not guaranteed (observed live: the model can
+# just narrate an answer and end the turn with stopReason=end_turn,
+# touching no tool whatsoever). Requiring BOTH "cap rate" and a second,
+# more specific underwriting term keeps this from false-positiving on a
+# reply that merely mentions a cap rate figure a tool already returned.
+_UNVERIFIED_UNDERWRITING_RE = re.compile(
+    r"cap[\s-]?rate", re.IGNORECASE
+), re.compile(r"dscr|cash[\s-]?on[\s-]?cash", re.IGNORECASE)
+
+
+def _looks_like_unverified_underwriting(text: str) -> bool:
+    cap_rate_re, other_re = _UNVERIFIED_UNDERWRITING_RE
+    return bool(cap_rate_re.search(text) and other_re.search(text))
 
 
 def _require_actor(request: Request) -> dict:
@@ -77,7 +101,10 @@ async def login(body: dict):
     }
 
 
-def _drain_and_resolve(harness_arn: str, session_id: str, thread_id: str, actor: dict, run_id: str, harness_stream, *, emit_run_started: bool):
+def _drain_and_resolve(
+    harness_arn: str, session_id: str, thread_id: str, actor: dict, run_id: str, harness_stream,
+    *, emit_run_started: bool, underwriting_retries_left: int = 1,
+):
     """Runs translate_stream over one harness call, forwarding every
     AG-UI event as an SSE-ready dict. Auto-resolves get_legacy_credentials
     transparently (loops back into the harness with the credential and
@@ -92,18 +119,91 @@ def _drain_and_resolve(harness_arn: str, session_id: str, thread_id: str, actor:
             break
         yield _encoder.encode(item)
 
-    if result is None or result.get("outcome") != "pending_tools":
-        if result and result.get("outcome") == "error":
-            log.error("Harness error for run %s: %s", run_id, result.get("message"))
+    if result is None:
+        return
+
+    if result.get("outcome") == "error":
+        log.error("Harness error for run %s: %s", run_id, result.get("message"))
+        return
+
+    if result.get("outcome") == "finished":
+        if (
+            underwriting_retries_left > 0
+            and not result.get("code_interpreter_completed")
+            and _looks_like_unverified_underwriting(result.get("full_text", ""))
+        ):
+            log.warning(
+                "Run %s answered an underwriting-style request without calling "
+                "code-interpreter at all -- forcing one corrective retry.", run_id,
+            )
+            correction = (
+                "Your last response gave cap rate / DSCR / cash-on-cash figures without "
+                "calling any tool at all. That is not permitted. Using the same "
+                "properties and NOI figures you already have, call the code-interpreter "
+                "tool to actually execute the underwriting calculation, then call "
+                "submit_underwriting_result with its exact output. Do not repeat the "
+                "same figures as prose again."
+            )
+            next_stream = harness_client.invoke(
+                harness_arn, session_id, actor["sub"],
+                messages=[{"role": "user", "content": [{"text": correction}]}],
+            )
+            yield from _drain_and_resolve(
+                harness_arn, session_id, thread_id, actor, run_id, next_stream,
+                emit_run_started=False, underwriting_retries_left=underwriting_retries_left - 1,
+            )
+            return
+        yield _encoder.encode(RunFinishedEvent(thread_id=thread_id, run_id=run_id, outcome=RunFinishedSuccessOutcome()))
+        return
+
+    if result.get("outcome") != "pending_tools":
         return
 
     pending = result["pending"]
+    code_interpreter_completed = result.get("code_interpreter_completed", False)
     auto_results = []
     human_needed = []
     for p in pending:
         if p["name"] == "get_legacy_credentials":
             cred = confirmation.resolve_legacy_credentials(actor["username"])
             auto_results.append({"toolUseId": p["toolUseId"], "result": cred, "status": "success"})
+
+        elif p["name"] == "submit_underwriting_result":
+            # The gate: this call is only trusted if a real code-interpreter
+            # tool call completed earlier in THIS SAME stream (see
+            # agui_translate.py). A model that tries to skip straight to
+            # this call -- typing the numbers itself instead of running
+            # them -- gets rejected with an error toolResult and can
+            # correct itself in the same turn, since the harness continues
+            # normally after any toolResult, success or error.
+            comparison = p["input"].get("comparison")
+            if not code_interpreter_completed:
+                log.warning("Rejected submit_underwriting_result for run %s: code-interpreter did not complete this turn", run_id)
+                auto_results.append({
+                    "toolUseId": p["toolUseId"],
+                    "status": "error",
+                    "result": {
+                        "error": "Rejected: code-interpreter was not called (or did not finish) this "
+                                 "turn. Call code-interpreter to actually execute the underwriting, "
+                                 "then call submit_underwriting_result again with its exact output."
+                    },
+                })
+            elif not isinstance(comparison, dict) or comparison.get("type") != "underwriting_comparison" or "properties" not in comparison:
+                auto_results.append({
+                    "toolUseId": p["toolUseId"],
+                    "status": "error",
+                    "result": {
+                        "error": "Rejected: 'comparison' is not a valid underwriting_comparison "
+                                 "object. It must be the exact JSON code-interpreter printed, parsed, "
+                                 "not something you composed yourself."
+                    },
+                })
+            else:
+                yield _encoder.encode(StateDeltaEvent(
+                    delta=[{"op": "replace", "path": "/comparison", "value": comparison}]
+                ))
+                auto_results.append({"toolUseId": p["toolUseId"], "status": "success", "result": {"received": True}})
+
         else:
             human_needed.append(p)
 
@@ -116,7 +216,10 @@ def _drain_and_resolve(harness_arn: str, session_id: str, thread_id: str, actor:
 
     if auto_results:
         next_stream = harness_client.resume_with_tool_results(harness_arn, session_id, actor["sub"], auto_results)
-        yield from _drain_and_resolve(harness_arn, session_id, thread_id, actor, run_id, next_stream, emit_run_started=False)
+        yield from _drain_and_resolve(
+            harness_arn, session_id, thread_id, actor, run_id, next_stream,
+            emit_run_started=False, underwriting_retries_left=underwriting_retries_left,
+        )
         return
 
     if human_needed:

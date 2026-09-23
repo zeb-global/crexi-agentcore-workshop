@@ -25,10 +25,7 @@ import uuid
 from ag_ui.core import (
     CustomEvent,
     RunErrorEvent,
-    RunFinishedEvent,
-    RunFinishedSuccessOutcome,
     RunStartedEvent,
-    StateDeltaEvent,
     TextMessageContentEvent,
     TextMessageEndEvent,
     TextMessageStartEvent,
@@ -44,21 +41,36 @@ import pricing
 def translate_stream(harness_stream, thread_id: str, run_id: str, *, emit_run_started: bool = True):
     """Generator: yields AG-UI BaseEvent instances as the harness stream
     arrives. The LAST item yielded is always a plain dict:
-      {"outcome": "finished", "usage": {...}}
-      {"outcome": "pending_tools", "pending": [{"toolUseId","name","input"}, ...], "usage": {...}}
+      {"outcome": "finished", "usage": {...}, "code_interpreter_completed": bool, "full_text": str}
+      {"outcome": "pending_tools", "pending": [{"toolUseId","name","input"}, ...], "usage": {...}, "code_interpreter_completed": bool}
       {"outcome": "error", "message": "..."}
-    RUN_FINISHED/RUN_STARTED framing for the "finished"/"error" cases is
-    emitted here; for "pending_tools" the caller (main.py) decides what
-    AG-UI framing to send once it knows which tools are auto-resolvable.
+    RUN_FINISHED framing is NOT emitted here for "finished" or
+    "pending_tools" -- main.py needs to inspect the outcome first (e.g.
+    to decide whether an underwriting answer that skipped code-interpreter
+    entirely needs a corrective retry before the run is really done).
     """
     if emit_run_started:
         yield RunStartedEvent(thread_id=thread_id, run_id=run_id)
 
     text_message_id = None
     tool_call_ids_by_index = {}
+    tool_names_by_id = {}  # toolUseId -> name, for resolving toolResult origin below
     current_message_tools = {}  # idx -> {"toolUseId", "name", "input_json"}
     total_usage = {"inputTokens": 0, "outputTokens": 0}
     stop_reason = None
+    # Set only when a code-interpreter tool call actually COMPLETES (a
+    # result comes back this stream) -- not merely started, since a
+    # parallel tool-use batch can end the stream before an auto-executed
+    # call finishes. This is the real signal submit_underwriting_result
+    # -- and, for a turn that ends WITHOUT calling any tool at all, main.py's
+    # own compliance check -- is checked against.
+    code_interpreter_completed = False
+    full_text = ""  # accumulated assistant text, so main.py can detect a
+    # turn that answered a comparison request in plain prose without ever
+    # touching code-interpreter or submit_underwriting_result at all --
+    # the gate in main.py only catches a model that CALLS
+    # submit_underwriting_result; it does nothing if the model skips
+    # tool-calling entirely, which is a real, observed failure mode.
 
     for event in harness_stream:
         if "messageStart" in event:
@@ -74,6 +86,7 @@ def translate_stream(harness_stream, thread_id: str, run_id: str, *, emit_run_st
                     "toolUseId": tool_use_id, "name": tool_name, "input_json": ""
                 }
                 tool_call_ids_by_index[idx] = tool_use_id
+                tool_names_by_id[tool_use_id] = tool_name
                 yield ToolCallStartEvent(tool_call_id=tool_use_id, tool_call_name=tool_name)
 
         elif "contentBlockDelta" in event:
@@ -84,6 +97,7 @@ def translate_stream(harness_stream, thread_id: str, run_id: str, *, emit_run_st
                 if text_message_id is None:
                     text_message_id = str(uuid.uuid4())
                     yield TextMessageStartEvent(message_id=text_message_id, role="assistant")
+                full_text += delta["text"]
                 yield TextMessageContentEvent(message_id=text_message_id, delta=delta["text"])
 
             elif idx in current_message_tools and "toolUse" in delta:
@@ -93,6 +107,8 @@ def translate_stream(harness_stream, thread_id: str, run_id: str, *, emit_run_st
 
             elif "toolResult" in delta:
                 tool_use_id = tool_call_ids_by_index.get(idx)
+                if tool_names_by_id.get(tool_use_id) == "code-interpreter":
+                    code_interpreter_completed = True
                 for block in delta["toolResult"]:
                     text = block.get("text", "")
                     yield ToolCallResultEvent(
@@ -101,15 +117,6 @@ def translate_stream(harness_stream, thread_id: str, run_id: str, *, emit_run_st
                         content=text,
                         role="tool",
                     )
-                    # The investor underwriting contract: the tool result
-                    # text IS the structured comparison payload when it
-                    # parses as JSON with type=underwriting_comparison.
-                    try:
-                        parsed = json.loads(text)
-                        if isinstance(parsed, dict) and parsed.get("type") == "underwriting_comparison":
-                            yield StateDeltaEvent(delta=[{"op": "replace", "path": "/comparison", "value": parsed}])
-                    except (json.JSONDecodeError, TypeError):
-                        pass
 
         elif "contentBlockStop" in event:
             idx = event["contentBlockStop"]["contentBlockIndex"]
@@ -141,8 +148,17 @@ def translate_stream(harness_stream, thread_id: str, run_id: str, *, emit_run_st
         pending = list(current_message_tools.values())
         for p in pending:
             p["input"] = json.loads(p["input_json"]) if p["input_json"] else {}
-        yield {"outcome": "pending_tools", "pending": pending, "usage": total_usage}
+        yield {
+            "outcome": "pending_tools",
+            "pending": pending,
+            "usage": total_usage,
+            "code_interpreter_completed": code_interpreter_completed,
+        }
         return
 
-    yield RunFinishedEvent(thread_id=thread_id, run_id=run_id, outcome=RunFinishedSuccessOutcome())
-    yield {"outcome": "finished", "usage": total_usage}
+    yield {
+        "outcome": "finished",
+        "usage": total_usage,
+        "code_interpreter_completed": code_interpreter_completed,
+        "full_text": full_text,
+    }

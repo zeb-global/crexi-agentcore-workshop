@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { login, sendMessage, resumeInterrupt } from "./api";
 import LoginScreen from "./components/LoginScreen";
 import ComparisonTable from "./components/ComparisonTable";
@@ -141,6 +143,8 @@ export default function App() {
     const text = input.trim();
     setInput("");
     setMessages((prev) => [...prev, { id: newId(), role: "user", text }]);
+    setToolCalls([]); // fresh turn -- don't let tool activity pile up across the session
+    toolIndexRef.current = {};
     setRunning(true);
     runIdRef.current = newId();
     try {
@@ -195,7 +199,11 @@ export default function App() {
           <div className="messages">
             {messages.map((m) => (
               <div key={m.id} className={`message message-${m.role}`}>
-                {m.text}
+                {m.role === "user" ? (
+                  m.text
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                )}
               </div>
             ))}
             <ToolTimeline toolCalls={toolCalls} />

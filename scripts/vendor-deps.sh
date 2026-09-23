@@ -5,5 +5,5 @@
 # extension (pypdf is confirmed pure-Python, no .so/.pyd files).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-pip install --quiet --no-compile --target services/mcp_market_data -r services/mcp_market_data/requirements.txt
+python3 -m pip install --quiet --no-compile --target services/mcp_market_data -r services/mcp_market_data/requirements.txt
 echo "Vendored deps into services/mcp_market_data/"
