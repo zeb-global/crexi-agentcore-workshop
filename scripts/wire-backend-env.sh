@@ -31,6 +31,18 @@ USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK"
 APP_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK" \
   --query "Stacks[0].Outputs[?OutputKey=='AppClientId'].OutputValue" --output text)
 
+LEGACY_DESK_URL=$(aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Legacy" \
+  --query "Stacks[0].Outputs[?OutputKey=='LegacyDeskUrl'].OutputValue" --output text)
+
+# Checkpoint 4 / Legacy Portal OAuth: creates (or reuses) the workload
+# identity + credential provider this reference deployment needs, and
+# wires the resulting Cognito/workload callback URLs together. See that
+# script's own header for why this lives here and not in `make bootstrap`.
+LEGACY_OAUTH_RETURN_URL="http://localhost:8000/oauth/legacy-callback"
+OAUTH_NAMES=$(bash scripts/setup-legacy-oauth.sh "$WORKSHOP_ID" "$LEGACY_OAUTH_RETURN_URL")
+LEGACY_OAUTH_WORKLOAD_NAME=$(echo "$OAUTH_NAMES" | grep LEGACY_OAUTH_WORKLOAD_NAME | cut -d= -f2)
+LEGACY_OAUTH_PROVIDER_NAME=$(echo "$OAUTH_NAMES" | grep LEGACY_OAUTH_PROVIDER_NAME | cut -d= -f2)
+
 cat > backend/.env <<EOF
 WORKSHOP_ID=${WORKSHOP_ID}
 AWS_REGION=${REGION}
@@ -38,6 +50,10 @@ INVESTOR_HARNESS_ARN=${INVESTOR_ARN}
 BROKER_HARNESS_ARN=${BROKER_ARN}
 COGNITO_USER_POOL_ID=${USER_POOL_ID}
 COGNITO_APP_CLIENT_ID=${APP_CLIENT_ID}
+LEGACY_DESK_URL=${LEGACY_DESK_URL}
+LEGACY_OAUTH_WORKLOAD_NAME=${LEGACY_OAUTH_WORKLOAD_NAME}
+LEGACY_OAUTH_PROVIDER_NAME=${LEGACY_OAUTH_PROVIDER_NAME}
+LEGACY_OAUTH_RETURN_URL=${LEGACY_OAUTH_RETURN_URL}
 EOF
 
 echo "Wrote backend/.env for WORKSHOP_ID=${WORKSHOP_ID}."
