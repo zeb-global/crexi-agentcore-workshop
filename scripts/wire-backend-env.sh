@@ -31,9 +31,6 @@ USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK"
 APP_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK" \
   --query "Stacks[0].Outputs[?OutputKey=='AppClientId'].OutputValue" --output text)
 
-LEGACY_DESK_URL=$(aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Legacy" \
-  --query "Stacks[0].Outputs[?OutputKey=='LegacyDeskUrl'].OutputValue" --output text)
-
 # Checkpoint 4 / Legacy Portal OAuth: creates (or reuses) the workload
 # identity + credential provider this reference deployment needs, and
 # wires the resulting Cognito/workload callback URLs together. See that
@@ -50,7 +47,6 @@ INVESTOR_HARNESS_ARN=${INVESTOR_ARN}
 BROKER_HARNESS_ARN=${BROKER_ARN}
 COGNITO_USER_POOL_ID=${USER_POOL_ID}
 COGNITO_APP_CLIENT_ID=${APP_CLIENT_ID}
-LEGACY_DESK_URL=${LEGACY_DESK_URL}
 LEGACY_OAUTH_WORKLOAD_NAME=${LEGACY_OAUTH_WORKLOAD_NAME}
 LEGACY_OAUTH_PROVIDER_NAME=${LEGACY_OAUTH_PROVIDER_NAME}
 LEGACY_OAUTH_RETURN_URL=${LEGACY_OAUTH_RETURN_URL}

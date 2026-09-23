@@ -43,7 +43,6 @@ APPROVAL_TOKEN_TTL_SECONDS = int(os.environ.get("APPROVAL_TOKEN_TTL_SECONDS", "1
 LEGACY_OAUTH_WORKLOAD_NAME = os.environ.get("LEGACY_OAUTH_WORKLOAD_NAME", "")
 LEGACY_OAUTH_PROVIDER_NAME = os.environ.get("LEGACY_OAUTH_PROVIDER_NAME", "")
 LEGACY_OAUTH_RETURN_URL = os.environ.get("LEGACY_OAUTH_RETURN_URL", "http://localhost:8000/oauth/legacy-callback")
-LEGACY_DESK_URL = os.environ.get("LEGACY_DESK_URL", "")
 
 # The frontend's own dev-server origin -- CORS must allow it explicitly.
 # Comma-separated if you ever need more than one (e.g. a deployed URL
