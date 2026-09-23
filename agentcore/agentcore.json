@@ -15,7 +15,7 @@
   "onlineEvalConfigs": [],
   "agentCoreGateways": [
     {
-      "name": "gw-readonly",
+      "name": "gw-readonly-dev01",
       "protocolType": "MCP",
       "description": "Read-only market data: listings, comps, documents",
       "targets": [
@@ -33,7 +33,7 @@
       "exceptionLevel": "NONE"
     },
     {
-      "name": "gw-ops",
+      "name": "gw-ops-dev01",
       "protocolType": "MCP",
       "description": "Listing write operations, approval-token gated",
       "targets": [
@@ -56,12 +56,12 @@
   "abTests": [],
   "harnesses": [
     {
-      "name": "investorAgent",
-      "path": "app/investorAgent"
+      "name": "investorAgent_dev01",
+      "path": "app/investorAgent_dev01"
     },
     {
-      "name": "brokerAgent",
-      "path": "app/brokerAgent"
+      "name": "brokerAgent_dev01",
+      "path": "app/brokerAgent_dev01"
     }
   ],
   "datasets": [],

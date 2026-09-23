@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "name": "dev01",
+    "description": "Workshop participant dev01",
+    "account": "347272280436",
+    "region": "us-west-2"
+  }
+]
