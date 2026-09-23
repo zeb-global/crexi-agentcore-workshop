@@ -6,12 +6,6 @@
     "region": "us-west-2"
   },
   {
-    "name": "alpha01",
-    "description": "Workshop participant alpha01",
-    "account": "347272280436",
-    "region": "us-west-2"
-  },
-  {
     "name": "beta01",
     "description": "Workshop participant beta01",
     "account": "347272280436",
