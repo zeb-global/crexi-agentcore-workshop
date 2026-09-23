@@ -79,9 +79,11 @@ make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID
 make dev
 ```
 
-`make bootstrap` takes a few minutes — it deploys 5 CDK stacks (data, identity, legacy desk, tool Lambdas,
-observability) and then the AgentCore harnesses and Gateways in two passes (see below for why). `make dev` starts
-the FastAPI backend on `:8000` and the Vite frontend on `:5173`; open **http://localhost:5173**.
+`make bootstrap` takes a few minutes — on first run it also provisions `infra/.venv`, `backend/.venv`,
+`agentcore/cdk/node_modules`, and `frontend/node_modules` before deploying 5 CDK stacks (data, identity, legacy
+desk, tool Lambdas, observability) and then the AgentCore harnesses and Gateways in two passes (see below for
+why). `make dev` starts the FastAPI backend on `:8000` and the Vite frontend on `:5173`; open
+**http://localhost:5173**.
 
 ### Logging in
 
@@ -201,6 +203,9 @@ valid target for anyone else to run against.** `make wire-backend-env WORKSHOP_I
 | `Invalid harness configuration: ... config file not found` | `agentcore.json`'s harness `path` doesn't match a real directory — almost always means `agentcore.json` needs re-rendering for your `WORKSHOP_ID` (`python3 scripts/render_agentcore_config.py $WORKSHOP_ID harnesses`) before the next `agentcore deploy`. |
 | Broker's legacy-desk login fails with "Invalid username or password" | `agentcore.json`/the generated `system-prompt.md` was last rendered for a different `WORKSHOP_ID` — re-render and redeploy for yours. |
 | `make dev` says `backend/.env not found` | Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` first. |
+| `sh: tsc: command not found` / `pip install` failures during `make bootstrap` | First-run setup: `make bootstrap` provisions `infra/.venv`, `backend/.venv`, `agentcore/cdk/node_modules`, and `frontend/node_modules` on its own the first time it runs (a few extra minutes) — no manual install needed. If it still fails, you likely have no network access to PyPI/npm (corporate proxy/firewall); fix that and re-run `make bootstrap`, which is safe to retry. |
+| `uvicorn`/Vite fails with `Address already in use` on `:8000` or `:5173` | A previous `make dev` (yours or a leftover process) is still holding the port — find it with `lsof -i :8000` and stop that specific process, then re-run `make dev`. Don't `pkill` by name; that can kill an unrelated process reusing the same command name. |
+| A harness call fails with `Unknown tool: <name>` after you added a custom tool | `harness.json`'s `allowedTools` needs an `@`-prefixed reference for any tool that isn't one of AWS's fixed built-ins (e.g. `@my-custom-tool`, matching how Gateway tools are already listed as `@market-data/*`) — a bare name in `allowedTools` only matches AWS's built-in tool identifiers and silently rejects everything else before it dispatches. |
 
 ## Repository layout
 
