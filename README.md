@@ -75,14 +75,15 @@ export AWS_REGION=us-west-2   # or your region
 
 make preflight
 make bootstrap WORKSHOP_ID=$WORKSHOP_ID WORKSHOP_SECRET=$WORKSHOP_SECRET
-make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID
 make dev
 ```
 
-`make bootstrap` takes a few minutes — on first run it also provisions `infra/.venv`, `backend/.venv`,
-`agentcore/cdk/node_modules`, and `frontend/node_modules` before deploying 5 CDK stacks (data, identity, legacy
-desk, tool Lambdas, observability) and then the AgentCore harnesses and Gateways in two passes (see below for
-why). `make dev` starts the FastAPI backend on `:8000` and the Vite frontend on `:5173`; open
+`make bootstrap` is the whole deploy, start to finish, in one command — on first run it also provisions
+`infra/.venv`, `backend/.venv`, `agentcore/cdk/node_modules`, and `frontend/node_modules` before deploying 5 CDK
+stacks (data, identity, legacy desk, tool Lambdas, observability), then the AgentCore harnesses and Gateways in
+two passes (see below for why), then the Legacy Portal OAuth workload identity and credential provider (see
+[Legacy Portal OAuth](#legacy-portal-oauth)), then writes `backend/.env`. Nothing else needs to run before
+`make dev`. `make dev` starts the FastAPI backend on `:8000` and the Vite frontend on `:5173`; open
 **http://localhost:5173**.
 
 ### Logging in
@@ -168,17 +169,35 @@ was last rendered/deployed for a *different* `WORKSHOP_ID` than the one you're c
 
 ### `make deploy` vs `make bootstrap`
 
-`make bootstrap` is the full first-time path (CDK + two-phase AgentCore deploy). If you only change a
-`system-prompt.md` or `harness.json` afterward, you don't need a full CDK re-deploy — `make deploy
-WORKSHOP_ID=$WORKSHOP_ID` re-renders and redeploys just the harness layer, reusing your already-deployed Gateways.
+`make bootstrap` is the full first-time path (CDK + two-phase AgentCore deploy + backend wiring, all in one
+command). If you only change a `system-prompt.md` or `harness.json` afterward, you don't need to repeat all of
+that — `make deploy WORKSHOP_ID=$WORKSHOP_ID` re-renders and redeploys just the harness layer, reusing your
+already-deployed Gateways. Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` afterward too if that harness
+change touched a harness ARN.
 
 ### Backend wiring
 
-`backend/config.py` reads harness ARNs, the Cognito pool/client ID, and table names from environment variables,
-falling back to a fixed set of `dev01` values that only exist so the module imports cleanly — **they are not a
-valid target for anyone else to run against.** `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` (backed by
-[`scripts/wire-backend-env.sh`](scripts/wire-backend-env.sh)) writes a real `backend/.env` for your own deployment;
-`make dev` refuses to start without one.
+`backend/config.py` reads harness ARNs, the Cognito pool/client ID, table names, and the Legacy Portal OAuth
+identity/provider names from environment variables, falling back to a fixed set of `dev01` values that only exist
+so the module imports cleanly — **they are not a valid target for anyone else to run against.** `make bootstrap`
+already runs [`scripts/wire-backend-env.sh`](scripts/wire-backend-env.sh) for you as its last step, writing a real
+`backend/.env`; you only need to run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` by hand again if you later
+redeploy just the harness layer with `make deploy` and it changed a harness ARN.
+
+### Legacy Portal OAuth
+
+Checkpoint 4's broker agent authorizes access to the legacy deal desk through a real per-user OAuth flow via
+AgentCore Identity's Token Vault, not a stored password. `make bootstrap`'s last step
+([`scripts/setup-legacy-oauth.sh`](scripts/setup-legacy-oauth.sh), called from `wire-backend-env.sh`) creates (or
+reuses) the two AgentCore Identity resources this needs — a workload identity and an OAuth2 credential provider
+pointing at the `LegacyOAuthAppClient` Cognito app client from `identity_stack.py` — and wires their callback URLs
+together. This is fully automated on this branch; nothing to do by hand.
+
+The first time you actually chat as marcus and ask about a listing's rent roll, `get_legacy_credentials` will
+return an authorization URL instead of a token — open it in your own browser (not the one AgentCore Browser
+drives), sign in, and grant consent. That's a one-time step per broker; every later request reuses the cached
+token with no repeat consent. See `backend/confirmation.py`'s module docs for the full flow, and note the
+deliberate simplification called out there and in Known Limitations below.
 
 ## Known limitations
 
@@ -191,6 +210,12 @@ valid target for anyone else to run against.** `make wire-backend-env WORKSHOP_I
 - **This backend keeps paused-run state (an in-flight price-change confirmation) in memory**, keyed by run ID —
   fine for a single-process workshop backend, but a restart mid-confirmation strands that run. A production version
   would persist this (e.g. in DynamoDB).
+- **The Legacy Portal OAuth access token travels as a `?access_token=` URL query parameter**, not a cookie or
+  header. This is a deliberate workshop simplification, not an oversight: the Harness's built-in Browser tool only
+  exposes human-like actions (navigate/click/type), so there is no way for the model to set a cookie or header
+  directly, and navigating with the token in the URL is the only path available. In production, mint a short-lived,
+  single-use exchange code instead (the same pattern `confirm_listing_change` already uses for price-change
+  approvals) so the real bearer token never lands in an access log or an AgentCore Browser session recording.
 
 ## Troubleshooting
 
@@ -201,8 +226,8 @@ valid target for anyone else to run against.** `make wire-backend-env WORKSHOP_I
 | `CDK not bootstrapped` | Run `cdk bootstrap` once for your account/region. |
 | `agentcore --version` prints nothing useful | An old `pip install bedrock-agentcore-starter-toolkit` is shadowing the real npm `agentcore` CLI on `PATH`. |
 | `Invalid harness configuration: ... config file not found` | `agentcore.json`'s harness `path` doesn't match a real directory — almost always means `agentcore.json` needs re-rendering for your `WORKSHOP_ID` (`python3 scripts/render_agentcore_config.py $WORKSHOP_ID harnesses`) before the next `agentcore deploy`. |
-| Broker's legacy-desk login fails with "Invalid username or password" | `agentcore.json`/the generated `system-prompt.md` was last rendered for a different `WORKSHOP_ID` — re-render and redeploy for yours. |
-| `make dev` says `backend/.env not found` | Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` first. |
+| Broker's legacy-desk `/sso` login fails ("Invalid or expired access token") | `agentcore.json`/the generated `system-prompt.md` was last rendered for a different `WORKSHOP_ID` — the legacy desk URL patched into the broker's system prompt points at a different participant's deployment, whose OAuth pool doesn't recognize your token. Re-render and redeploy for yours. |
+| `make dev` says `backend/.env not found` | `make bootstrap` writes this as its last step — if it's missing, either bootstrap didn't complete, or you redeployed just the harness layer with `make deploy` afterward. Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID`. |
 | `sh: tsc: command not found` / `pip install` failures during `make bootstrap` | First-run setup: `make bootstrap` provisions `infra/.venv`, `backend/.venv`, `agentcore/cdk/node_modules`, and `frontend/node_modules` on its own the first time it runs (a few extra minutes) — no manual install needed. If it still fails, you likely have no network access to PyPI/npm (corporate proxy/firewall); fix that and re-run `make bootstrap`, which is safe to retry. |
 | `uvicorn`/Vite fails with `Address already in use` on `:8000` or `:5173` | A previous `make dev` (yours or a leftover process) is still holding the port — find it with `lsof -i :8000` and stop that specific process, then re-run `make dev`. Don't `pkill` by name; that can kill an unrelated process reusing the same command name. |
 | A harness call fails with `Unknown tool: <name>` after you added a custom tool | `harness.json`'s `allowedTools` needs an `@`-prefixed reference for any tool that isn't one of AWS's fixed built-ins (e.g. `@my-custom-tool`, matching how Gateway tools are already listed as `@market-data/*`) — a bare name in `allowedTools` only matches AWS's built-in tool identifiers and silently rejects everything else before it dispatches. |

@@ -36,6 +36,13 @@ vendor-deps:
 # actually exists. So: deploy this participant's (uniquely-named) gateways
 # alone first, then render the harnesses against the real ARNs and deploy
 # again to add them to the same stack.
+#
+# This is the REFERENCE branch's bootstrap -- one command, start to finish,
+# including wire-backend-env (harness ARNs + Cognito + the Legacy Portal
+# OAuth workload identity/credential provider, see scripts/setup-legacy-oauth.sh).
+# `make dev` needs nothing else run first. The participant workshop branch's
+# bootstrap stops after the CDK deploy on purpose -- see that branch's own
+# Makefile and the walkthrough for why.
 bootstrap: vendor-deps
 	@test -n "$(WORKSHOP_ID)" || (echo "Usage: make bootstrap WORKSHOP_ID=<id> WORKSHOP_SECRET=<secret>"; exit 1)
 	@test -n "$(WORKSHOP_SECRET)" || (echo "WORKSHOP_SECRET is required"; exit 1)
@@ -49,6 +56,7 @@ bootstrap: vendor-deps
 	agentcore deploy --yes --target $(WORKSHOP_ID)
 	python3 scripts/render_agentcore_config.py $(WORKSHOP_ID) harnesses
 	agentcore deploy --yes --target $(WORKSHOP_ID)
+	bash scripts/wire-backend-env.sh $(WORKSHOP_ID)
 
 # Redeploy just the harness/gateway layer (e.g. after a system-prompt or
 # harness.json edit) without a full cdk deploy. Re-renders against this
