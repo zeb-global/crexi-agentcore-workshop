@@ -50,6 +50,18 @@ _encoder = EventEncoder()
 # Populated when a run pauses on confirm_listing_change; consumed on resume.
 _paused_runs: dict[str, dict] = {}
 
+# run_id -> True once code-interpreter has completed ANYWHERE in this run.
+# translate_stream()'s own code_interpreter_completed is scoped to a single
+# harness_client.invoke()/resume_with_tool_results() stream -- it resets to
+# False on every new stream. If the model splits code-interpreter and
+# submit_underwriting_result across separate turns (each its own stream --
+# and the system prompt used to explicitly ask for this), the per-stream
+# flag alone would forget code-interpreter ever ran and wrongly reject the
+# submit. This dict makes "did code-interpreter complete" a per-RUN fact
+# instead, independent of how many streams the run is split across. Popped
+# when the run truly finishes to avoid unbounded growth.
+_code_interpreter_completed_runs: dict[str, bool] = {}
+
 # Catches a model that answers an underwriting-style comparison in plain
 # prose without ever calling code-interpreter or submit_underwriting_result
 # at all -- the submit_underwriting_result gate only fires if the model
@@ -122,14 +134,18 @@ def _drain_and_resolve(
     if result is None:
         return
 
+    if result.get("code_interpreter_completed"):
+        _code_interpreter_completed_runs[run_id] = True
+
     if result.get("outcome") == "error":
         log.error("Harness error for run %s: %s", run_id, result.get("message"))
+        _code_interpreter_completed_runs.pop(run_id, None)
         return
 
     if result.get("outcome") == "finished":
         if (
             underwriting_retries_left > 0
-            and not result.get("code_interpreter_completed")
+            and not _code_interpreter_completed_runs.get(run_id, False)
             and _looks_like_unverified_underwriting(result.get("full_text", ""))
         ):
             log.warning(
@@ -154,13 +170,14 @@ def _drain_and_resolve(
             )
             return
         yield _encoder.encode(RunFinishedEvent(thread_id=thread_id, run_id=run_id, outcome=RunFinishedSuccessOutcome()))
+        _code_interpreter_completed_runs.pop(run_id, None)
         return
 
     if result.get("outcome") != "pending_tools":
         return
 
     pending = result["pending"]
-    code_interpreter_completed = result.get("code_interpreter_completed", False)
+    code_interpreter_completed = _code_interpreter_completed_runs.get(run_id, False)
     auto_results = []
     human_needed = []
     for p in pending:
