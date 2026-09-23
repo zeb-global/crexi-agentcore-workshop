@@ -20,7 +20,13 @@ python3 -m pip install --quiet --no-compile --upgrade --target services/legacy_d
 echo "Vendored deps into services/legacy_deal_desk/"
 
 echo "Setting up infra/.venv (CDK app deps)..."
-if [ ! -d infra/.venv ]; then
+# Checks for a working pip binary, not just that the directory exists --
+# a venv dir can exist but be broken (e.g. left over from a system Python
+# upgrade after it was created), and `-d` alone would silently try to use
+# it and fail deep inside pip with a confusing error. Recreate whenever
+# it's not there or not actually runnable.
+if [ ! -x infra/.venv/bin/pip ]; then
+  rm -rf infra/.venv
   python3 -m venv infra/.venv
 fi
 infra/.venv/bin/pip install --quiet --upgrade pip
@@ -32,7 +38,8 @@ echo "Installing agentcore/cdk/node_modules (npm) -- needed for agentcore deploy
 echo "agentcore/cdk/node_modules ready."
 
 echo "Setting up backend/.venv (FastAPI app deps)..."
-if [ ! -d backend/.venv ]; then
+if [ ! -x backend/.venv/bin/pip ]; then
+  rm -rf backend/.venv
   python3 -m venv backend/.venv
 fi
 backend/.venv/bin/pip install --quiet --upgrade pip
