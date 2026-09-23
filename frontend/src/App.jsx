@@ -109,6 +109,20 @@ export default function App() {
     }
   }, []);
 
+  function handleLogout() {
+    setSession(null);
+    setMessages([]);
+    setToolCalls([]);
+    setComparison(null);
+    setCostEvents([]);
+    setPendingInterrupt(null);
+    setRunning(false);
+    threadIdRef.current = newId();
+    runIdRef.current = null;
+    messageIndexRef.current = {};
+    toolIndexRef.current = {};
+  }
+
   async function handleLogin(username, password) {
     setLoginBusy(true);
     setLoginError(null);
@@ -164,9 +178,16 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span>CREXi Workshop Assistant</span>
+        <span className="app-logo">
+          CREX<span className="app-logo-accent">i</span>
+          <span className="app-logo-sub">Workshop Assistant</span>
+        </span>
         <span className="app-header-user">
-          {session.username} · {session.group}
+          <span className="app-header-name">{session.username}</span>
+          <span className="app-header-group">{session.group}</span>
+          <button className="btn-link" onClick={handleLogout}>
+            Sign out
+          </button>
         </span>
       </header>
       <div className="app-body">

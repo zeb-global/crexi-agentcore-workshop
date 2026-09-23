@@ -23,7 +23,7 @@
     }
   ],
   "skills": [],
-  "allowedTools": ["@market-data/*", "code-interpreter", "@builtin/file_operations"],
+  "allowedTools": ["@market-data/*", "code-interpreter"],
   "memory": {
     "mode": "managed",
     "strategies": ["SEMANTIC", "SUMMARIZATION", "USER_PREFERENCE"],
