@@ -34,12 +34,21 @@ Two real, load-bearing facts this script exists to work around:
    app/<base>/{harness.json,system-prompt.md} rather than requiring anyone to
    hand-maintain per-participant copies; these generated dirs are gitignored.
 
+4. app/brokerAgent/system-prompt.md names the legacy deal desk's Lambda
+   Function URL as literal text for the model to navigate the Browser tool
+   to. Found live: a second participant's broker harness tried to log into
+   the FIRST participant's legacy desk with their OWN credentials and
+   failed ("Invalid username or password"), because that URL was hardcoded
+   to whichever workshop deployed first. This script patches in the real
+   per-participant URL (from Crexi<id>Legacy's LegacyDeskUrl output) when
+   generating the harness dir.
+
 Usage:
     python3 scripts/render_agentcore_config.py <WORKSHOP_ID> gateways
     python3 scripts/render_agentcore_config.py <WORKSHOP_ID> harnesses
 """
 import json
-import shutil
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -52,6 +61,7 @@ GATEWAYS = [
     ("gw-ops", "listing-ops", "ListingOpsFunctionArn"),
 ]
 HARNESSES = ["investorAgent", "brokerAgent"]
+LEGACY_DESK_URL_RE = re.compile(r"https://[a-z0-9]+\.lambda-url\.[a-z0-9-]+\.on\.aws/")
 # harness name charset is ^[a-zA-Z][a-zA-Z0-9_]{0,39}$ -- no hyphens.
 HARNESS_SEP = "_"
 # gateway names may use hyphens.
@@ -118,7 +128,12 @@ def render_harnesses(config: dict, workshop_id: str) -> None:
         src_dir = Path("app") / base
         dst_dir = Path("app") / f"{base}_{workshop_id}"
         dst_dir.mkdir(exist_ok=True)
-        shutil.copyfile(src_dir / "system-prompt.md", dst_dir / "system-prompt.md")
+
+        system_prompt = (src_dir / "system-prompt.md").read_text()
+        if base == "brokerAgent":
+            legacy_url = cfn_output(f"Crexi{workshop_id}Legacy", "LegacyDeskUrl")
+            system_prompt = LEGACY_DESK_URL_RE.sub(legacy_url, system_prompt)
+        (dst_dir / "system-prompt.md").write_text(system_prompt)
 
         config["harnesses"].append({"name": name, "path": str(dst_dir)})
 

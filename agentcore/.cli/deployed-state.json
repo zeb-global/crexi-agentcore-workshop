@@ -49,6 +49,106 @@
         "stackName": "AgentCore-crexiWorkshopV2-default",
         "deployHash": "16ffc40353dad280"
       }
+    },
+    "alpha01": {
+      "resources": {
+        "mcp": {
+          "gateways": {
+            "gw-readonly-alpha01": {
+              "gatewayId": "crexiworkshopv2-gw-readonly-alpha01-sb5u2shi6z",
+              "gatewayArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:gateway/crexiworkshopv2-gw-readonly-alpha01-sb5u2shi6z",
+              "gatewayUrl": "https://crexiworkshopv2-gw-readonly-alpha01-sb5u2shi6z.gateway.bedrock-agentcore.us-west-2.amazonaws.com/mcp",
+              "targets": {
+                "market-data": {
+                  "targetId": "1X6OMORNGS"
+                }
+              }
+            },
+            "gw-ops-alpha01": {
+              "gatewayId": "crexiworkshopv2-gw-ops-alpha01-3hruipyrpn",
+              "gatewayArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:gateway/crexiworkshopv2-gw-ops-alpha01-3hruipyrpn",
+              "gatewayUrl": "https://crexiworkshopv2-gw-ops-alpha01-3hruipyrpn.gateway.bedrock-agentcore.us-west-2.amazonaws.com/mcp",
+              "targets": {
+                "listing-ops": {
+                  "targetId": "MOCNAZWETN"
+                }
+              }
+            }
+          }
+        },
+        "harnesses": {
+          "investorAgent_alpha01": {
+            "harnessId": "crexiWorkshopV2_investorAgent_alpha01-1y3mt63nop",
+            "harnessArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:harness/crexiWorkshopV2_investorAgent_alpha01-1y3mt63nop",
+            "roleArn": "arn:aws:iam::347272280436:role/crexiWorkshopV2_investorAgent_alpha01",
+            "status": "READY",
+            "harnessVersion": 1,
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:runtime/harness_crexiWorkshopV2_investorAgent_alpha01-rYttlPF4qq",
+            "provisioner": "cloudformation"
+          },
+          "brokerAgent_alpha01": {
+            "harnessId": "crexiWorkshopV2_brokerAgent_alpha01-7foKRWQXPD",
+            "harnessArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:harness/crexiWorkshopV2_brokerAgent_alpha01-7foKRWQXPD",
+            "roleArn": "arn:aws:iam::347272280436:role/crexiWorkshopV2_brokerAgent_alpha01",
+            "status": "READY",
+            "harnessVersion": 2,
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:runtime/harness_crexiWorkshopV2_brokerAgent_alpha01-ifTfUZBqgQ",
+            "provisioner": "cloudformation"
+          }
+        },
+        "stackName": "AgentCore-crexiWorkshopV2-alpha01",
+        "deployHash": "dfe3697e7918ffbd"
+      }
+    },
+    "beta01": {
+      "resources": {
+        "mcp": {
+          "gateways": {
+            "gw-ops-beta01": {
+              "gatewayId": "crexiworkshopv2-gw-ops-beta01-ojq0jnoctl",
+              "gatewayArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:gateway/crexiworkshopv2-gw-ops-beta01-ojq0jnoctl",
+              "gatewayUrl": "https://crexiworkshopv2-gw-ops-beta01-ojq0jnoctl.gateway.bedrock-agentcore.us-west-2.amazonaws.com/mcp",
+              "targets": {
+                "listing-ops": {
+                  "targetId": "MGXJFTASRL"
+                }
+              }
+            },
+            "gw-readonly-beta01": {
+              "gatewayId": "crexiworkshopv2-gw-readonly-beta01-rvqi7uprhf",
+              "gatewayArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:gateway/crexiworkshopv2-gw-readonly-beta01-rvqi7uprhf",
+              "gatewayUrl": "https://crexiworkshopv2-gw-readonly-beta01-rvqi7uprhf.gateway.bedrock-agentcore.us-west-2.amazonaws.com/mcp",
+              "targets": {
+                "market-data": {
+                  "targetId": "DHFG82GVJT"
+                }
+              }
+            }
+          }
+        },
+        "harnesses": {
+          "investorAgent_beta01": {
+            "harnessId": "crexiWorkshopV2_investorAgent_beta01-bDuw9FVEE0",
+            "harnessArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:harness/crexiWorkshopV2_investorAgent_beta01-bDuw9FVEE0",
+            "roleArn": "arn:aws:iam::347272280436:role/crexiWorkshopV2_investorAgent_beta01",
+            "status": "READY",
+            "harnessVersion": 1,
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:runtime/harness_crexiWorkshopV2_investorAgent_beta01-7zj55o6GKV",
+            "provisioner": "cloudformation"
+          },
+          "brokerAgent_beta01": {
+            "harnessId": "crexiWorkshopV2_brokerAgent_beta01-I2auGS2d0G",
+            "harnessArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:harness/crexiWorkshopV2_brokerAgent_beta01-I2auGS2d0G",
+            "roleArn": "arn:aws:iam::347272280436:role/crexiWorkshopV2_brokerAgent_beta01",
+            "status": "READY",
+            "harnessVersion": 2,
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:347272280436:runtime/harness_crexiWorkshopV2_brokerAgent_beta01-q2Xyr5H60G",
+            "provisioner": "cloudformation"
+          }
+        },
+        "stackName": "AgentCore-crexiWorkshopV2-beta01",
+        "deployHash": "3fbe1878beaea582"
+      }
     }
   }
 }

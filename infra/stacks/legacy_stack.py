@@ -8,6 +8,7 @@ the MCPs read — that separation is the point of the exercise.
 import os
 
 from aws_cdk import (
+    CfnOutput,
     CustomResource,
     Duration,
     RemovalPolicy,
@@ -74,6 +75,14 @@ class LegacyStack(Stack):
         self.fn_url = self.app_fn.add_function_url(
             auth_type=_lambda.FunctionUrlAuthType.NONE,
         )
+        # Every harness's system-prompt.md literally names this URL as text
+        # for the model to navigate the Browser tool to -- it was hardcoded
+        # to whichever workshop deployed first, so every other participant's
+        # broker harness tried to log into THAT workshop's legacy desk with
+        # THEIR OWN credentials and failed. render_agentcore_config.py reads
+        # this output and patches the real per-participant URL into the
+        # generated system-prompt.md copy.
+        CfnOutput(self, "LegacyDeskUrl", value=self.fn_url.url)
 
         seed_fn = _lambda.Function(
             self,
