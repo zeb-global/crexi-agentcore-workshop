@@ -46,8 +46,8 @@
   "skills": [],
   "allowedTools": [
     "@market-data/*",
-    "code-interpreter",
-    "submit_underwriting_result"
+    "@code-interpreter",
+    "@submit_underwriting_result"
   ],
   "memory": {
     "mode": "managed",

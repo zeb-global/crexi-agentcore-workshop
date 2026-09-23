@@ -107,7 +107,12 @@ def translate_stream(harness_stream, thread_id: str, run_id: str, *, emit_run_st
 
             elif "toolResult" in delta:
                 tool_use_id = tool_call_ids_by_index.get(idx)
-                if tool_names_by_id.get(tool_use_id) == "code-interpreter":
+                # The model always calls this tool by AWS's fixed built-in
+                # name "code_interpreter" (underscore) at the actual
+                # Converse/tool_use layer -- regardless of the "code-interpreter"
+                # (hyphen) name we gave it in harness.json's tools[] array,
+                # which only matters for allowedTools matching (as "@code-interpreter").
+                if tool_names_by_id.get(tool_use_id) == "code_interpreter":
                     code_interpreter_completed = True
                 for block in delta["toolResult"]:
                     text = block.get("text", "")
