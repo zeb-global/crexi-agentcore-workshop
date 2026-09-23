@@ -13,6 +13,7 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
+    aws_cognito as cognito,
     aws_dynamodb as dynamodb,
     aws_lambda as _lambda,
     aws_logs as logs,
@@ -29,6 +30,8 @@ class LegacyStack(Stack):
         *,
         workshop_id: str,
         listings_table: dynamodb.ITable,
+        oauth_user_pool: cognito.IUserPool,
+        oauth_client_id: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -66,6 +69,13 @@ class LegacyStack(Stack):
                 "CREDS_TABLE": self.creds_table.table_name,
                 "RECORDS_TABLE": self.records_table.table_name,
                 "LISTINGS_TABLE": listings_table.table_name,
+                # Checkpoint 4 / Legacy Portal OAuth: /sso verifies tokens issued by
+                # this pool's LegacyOAuthAppClient (see identity_stack.py). Real
+                # per-user 3LO consent happens upstream via AgentCore Identity's
+                # Token Vault -- this Lambda only ever verifies a token it's handed,
+                # it never participates in the OAuth dance itself.
+                "OAUTH_ISSUER": f"https://cognito-idp.{Stack.of(self).region}.amazonaws.com/{oauth_user_pool.user_pool_id}",
+                "OAUTH_CLIENT_ID": oauth_client_id,
             },
         )
         self.creds_table.grant_read_data(self.app_fn)

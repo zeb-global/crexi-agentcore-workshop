@@ -8,17 +8,88 @@ production-grade session security).
 
 Deployed as a Lambda Function URL because AgentCore Browser runs inside AWS
 and has no route to a participant's laptop -- this cannot be `localhost`.
+
+/sso is the OAuth landing route for Checkpoint 4 / Legacy Portal OAuth: real
+per-user 3-legged consent happens upstream via AgentCore Identity's Token
+Vault (see backend/confirmation.py), and this route's only job is to verify
+the resulting token and turn it into the same session cookie the plain
+username/password path already produces below.
+
+WORKSHOP SIMPLIFICATION, called out deliberately (see the walkthrough and
+README's Known Limitations): the access token is passed as a `?access_token=`
+URL query parameter, because the Harness's built-in Browser tool only has
+human-like actions (navigate/click/type) -- there's no way for the model to
+set a cookie or header directly. That means the real token can end up in
+this Lambda's access logs and in any AgentCore Browser session recording.
+In production, mint a short-lived, single-use exchange code instead (the
+same pattern already used for price-change approval tokens) and never put
+the real bearer token in a URL.
 """
 import hashlib
 import hmac
 import html
+import json
 import os
+import ssl
 import time
 import urllib.parse
+import urllib.request
 
 import boto3
+import certifi
+from jose import jwk, jwt
+from jose.utils import base64url_decode
 
 dynamodb = boto3.resource("dynamodb")
+
+_jwks_cache = None
+_jwks_cache_at = 0
+_JWKS_TTL_SECONDS = 3600
+
+
+def _oauth_jwks_url() -> str:
+    return f"{os.environ['OAUTH_ISSUER']}/.well-known/jwks.json"
+
+
+def _get_oauth_jwks() -> dict:
+    global _jwks_cache, _jwks_cache_at
+    if _jwks_cache is None or (time.time() - _jwks_cache_at) > _JWKS_TTL_SECONDS:
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        with urllib.request.urlopen(_oauth_jwks_url(), timeout=5, context=ctx) as resp:
+            _jwks_cache = json.loads(resp.read())
+            _jwks_cache_at = time.time()
+    return _jwks_cache
+
+
+def _verify_oauth_access_token(access_token: str) -> str | None:
+    """Verifies signature, expiry, issuer, and client_id against the
+    LegacyOAuthAppClient pool (see infra/stacks/identity_stack.py). Returns
+    the token's `username` claim on success, None on any failure -- this
+    Lambda never trusts a token it hasn't independently verified itself,
+    same trust boundary as backend/auth.py's verify_token()."""
+    try:
+        headers = jwt.get_unverified_header(access_token)
+        jwks = _get_oauth_jwks()
+        key_data = next((k for k in jwks["keys"] if k["kid"] == headers.get("kid")), None)
+        if key_data is None:
+            return None
+        public_key = jwk.construct(key_data)
+        message, encoded_sig = access_token.rsplit(".", 1)
+        signature = base64url_decode(encoded_sig.encode("utf-8"))
+        if not public_key.verify(message.encode("utf-8"), signature):
+            return None
+        claims = jwt.get_unverified_claims(access_token)
+        if claims.get("token_use") != "access":
+            return None
+        if claims.get("exp", 0) < time.time():
+            return None
+        if claims.get("iss") != os.environ["OAUTH_ISSUER"]:
+            return None
+        if claims.get("client_id") != os.environ["OAUTH_CLIENT_ID"]:
+            return None
+        return claims.get("username")
+    except Exception:
+        return None
 
 _COOKIE_SECRET = os.environ.get("WORKSHOP_SECRET", "changeme")
 _COOKIE_NAME = "legacy_session"
@@ -141,6 +212,25 @@ def handler(event, context):
                 "body": _login_page("Invalid username or password."),
             }
 
+        return {
+            "statusCode": 302,
+            "headers": {
+                "Location": "/",
+                "Set-Cookie": _make_cookie(username),
+                "Content-Type": "text/html; charset=utf-8",
+            },
+            "body": "",
+        }
+
+    if raw_path == "/sso":
+        access_token = query.get("access_token", "")
+        username = _verify_oauth_access_token(access_token) if access_token else None
+        if not username:
+            return {
+                "statusCode": 401,
+                "headers": {"Content-Type": "text/html; charset=utf-8"},
+                "body": _login_page("Invalid or expired access token."),
+            }
         return {
             "statusCode": 302,
             "headers": {

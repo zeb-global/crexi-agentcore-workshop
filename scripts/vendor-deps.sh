@@ -15,6 +15,10 @@ echo "Vendoring pure-Python deps into services/mcp_market_data/ (CodeZip, no Doc
 python3 -m pip install --quiet --no-compile --upgrade --target services/mcp_market_data -r services/mcp_market_data/requirements.txt
 echo "Vendored deps into services/mcp_market_data/"
 
+echo "Vendoring pure-Python deps into services/legacy_deal_desk/ (bare python-jose, no compiled crypto backend)..."
+python3 -m pip install --quiet --no-compile --upgrade --target services/legacy_deal_desk -r services/legacy_deal_desk/requirements.txt
+echo "Vendored deps into services/legacy_deal_desk/"
+
 echo "Setting up infra/.venv (CDK app deps)..."
 if [ ! -d infra/.venv ]; then
   python3 -m venv infra/.venv

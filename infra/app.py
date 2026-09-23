@@ -47,6 +47,8 @@ legacy = LegacyStack(
     f"Crexi{WORKSHOP_ID}Legacy",
     workshop_id=WORKSHOP_ID,
     listings_table=data.listings_table,
+    oauth_user_pool=identity.user_pool,
+    oauth_client_id=identity.legacy_oauth_client.user_pool_client_id,
     env=env,
 )
 tools = ToolsStack(

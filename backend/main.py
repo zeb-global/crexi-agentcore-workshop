@@ -23,7 +23,7 @@ from ag_ui.core import (
 from ag_ui.encoder import EventEncoder
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 import auth
 import config
@@ -353,6 +353,28 @@ async def browser_live_view(request: Request):
     # AgentCore API exposing the harness's in-flight session ID. Not
     # implemented in this reference build.
     raise HTTPException(501, "Browser live-view is not wired up in this reference build.")
+
+
+@app.get("/oauth/legacy-callback")
+async def legacy_oauth_callback(request: Request):
+    """Where AgentCore Identity redirects the broker's own browser after
+    they grant consent on the legacy portal's OAuth provider (Checkpoint
+    4 / Legacy Portal OAuth) -- see confirmation.py's module docs for the
+    full flow and the production caveat on how the user identity is
+    bound here. This route is hit by a plain browser redirect, not an
+    XHR from the SPA, so there is no Authorization header to check --
+    `_require_actor` does not apply here.
+    """
+    session_id = request.query_params.get("session_id")
+    if not session_id:
+        return HTMLResponse("<p>Missing session_id.</p>", status_code=400)
+    result = confirmation.complete_legacy_oauth(session_id)
+    if "error" in result:
+        return HTMLResponse(f"<p>{result['error']}</p>", status_code=400)
+    return HTMLResponse(
+        "<p>Authorization complete. You can close this tab and return to the chat "
+        "-- ask the agent to try again.</p>"
+    )
 
 
 @app.get("/health")

@@ -33,6 +33,18 @@ ARTIFACTS_BUCKET = os.environ.get(
 
 APPROVAL_TOKEN_TTL_SECONDS = int(os.environ.get("APPROVAL_TOKEN_TTL_SECONDS", "120"))
 
+# Legacy Portal OAuth (Checkpoint 4) -- all three are things a participant
+# creates by hand and pastes in, not something a script can discover:
+# LEGACY_OAUTH_WORKLOAD_NAME from `aws bedrock-agentcore-control
+# create-workload-identity`, LEGACY_OAUTH_PROVIDER_NAME from
+# `create-oauth2-credential-provider`, LEGACY_OAUTH_RETURN_URL is this
+# backend's own callback route, which must be registered on the workload
+# identity as an AllowedResourceOauth2ReturnUrl.
+LEGACY_OAUTH_WORKLOAD_NAME = os.environ.get("LEGACY_OAUTH_WORKLOAD_NAME", "")
+LEGACY_OAUTH_PROVIDER_NAME = os.environ.get("LEGACY_OAUTH_PROVIDER_NAME", "")
+LEGACY_OAUTH_RETURN_URL = os.environ.get("LEGACY_OAUTH_RETURN_URL", "http://localhost:8000/oauth/legacy-callback")
+LEGACY_DESK_URL = os.environ.get("LEGACY_DESK_URL", "")
+
 # The frontend's own dev-server origin -- CORS must allow it explicitly.
 # Comma-separated if you ever need more than one (e.g. a deployed URL
 # alongside local dev). Defaults to Vite's own default port, matching

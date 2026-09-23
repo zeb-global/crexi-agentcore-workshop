@@ -1,0 +1,9 @@
+# Bare python-jose (no [cryptography] extra) -- pulls in pure-Python rsa/pyasn1/ecdsa
+# backends instead of the compiled `cryptography` package, so `pip install --target`
+# from any dev laptop produces a wheel that actually runs on this Lambda's ARM64
+# runtime. See scripts/vendor-deps.sh for the same constraint applied to pypdf.
+python-jose
+# certifi: same fix backend/auth.py already needed -- some Python builds (notably
+# certain macOS installs) have no usable default CA bundle for urllib, which fails
+# JWKS fetches with CERTIFICATE_VERIFY_FAILED. Pure data package, no compiled bits.
+certifi

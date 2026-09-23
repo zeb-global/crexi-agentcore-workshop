@@ -44,6 +44,42 @@ class IdentityStack(Stack):
             generate_secret=False,
         )
 
+        # A second app client + Hosted UI domain on the SAME pool, standing in for
+        # "the legacy deal desk's own OAuth provider" (Checkpoint 4 / Legacy Portal
+        # OAuth). Reusing dana/marcus's real identity here is deliberate: it's the
+        # believable version of the scenario ("Marcus authorizes the agent using his
+        # own CREXi identity"), and it avoids standing up a second, redundant user
+        # pool + seeded users just for this one demo. This is a SEPARATE app client
+        # (not WorkshopAppClient above) because it needs the OAuth authorization_code
+        # grant + a client secret, neither of which the main app's client needs.
+        #
+        # Callback URLs are seeded with a placeholder because the real one (AgentCore
+        # Identity's own callback, from `create-oauth2-credential-provider`) isn't
+        # known until a participant creates that credential provider by hand in
+        # Checkpoint 4 -- same two-phase problem as Gateway ARNs, solved the same way
+        # this whole redesign solves it: the participant runs one more CLI command
+        # (`aws cognito-idp update-user-pool-client`) themselves once they have the
+        # real value, instead of a script patching it in after the fact.
+        domain_prefix = f"crexi-{workshop_id}-legacy-oauth-{Stack.of(self).account}"[:63].lower()
+        self.legacy_oauth_domain = self.user_pool.add_domain(
+            "LegacyOAuthDomain",
+            cognito_domain=cognito.CognitoDomainOptions(domain_prefix=domain_prefix),
+        )
+
+        self.legacy_oauth_client = self.user_pool.add_client(
+            "LegacyOAuthAppClient",
+            user_pool_client_name=f"crexi-{workshop_id}-legacy-oauth",
+            generate_secret=True,
+            o_auth=cognito.OAuthSettings(
+                flows=cognito.OAuthFlows(authorization_code_grant=True),
+                scopes=[cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL],
+                # Placeholder -- update this once the real AgentCore Identity
+                # callback URL exists (see Checkpoint 4 in the walkthrough).
+                callback_urls=["https://example.com/callback"],
+            ),
+            supported_identity_providers=[cognito.UserPoolClientIdentityProvider.COGNITO],
+        )
+
         for group in ("investors", "brokers"):
             cognito.CfnUserPoolGroup(
                 self,
@@ -91,3 +127,18 @@ class IdentityStack(Stack):
         CfnOutput(self, "UserPoolId", value=self.user_pool.user_pool_id)
         CfnOutput(self, "AppClientId", value=self.app_client.user_pool_client_id)
         CfnOutput(self, "DiscoveryUrl", value=self.discovery_url)
+
+        legacy_oauth_domain_url = f"https://{domain_prefix}.auth.{region}.amazoncognito.com"
+        CfnOutput(self, "LegacyOAuthClientId", value=self.legacy_oauth_client.user_pool_client_id)
+        CfnOutput(self, "LegacyOAuthIssuer", value=self.discovery_url.removesuffix("/.well-known/openid-configuration"))
+        CfnOutput(self, "LegacyOAuthAuthorizationEndpoint", value=f"{legacy_oauth_domain_url}/oauth2/authorize")
+        CfnOutput(self, "LegacyOAuthTokenEndpoint", value=f"{legacy_oauth_domain_url}/oauth2/token")
+        CfnOutput(
+            self,
+            "LegacyOAuthClientSecretCommand",
+            value=(
+                f"aws cognito-idp describe-user-pool-client --user-pool-id {self.user_pool.user_pool_id} "
+                f"--client-id {self.legacy_oauth_client.user_pool_client_id} "
+                "--query 'UserPoolClient.ClientSecret' --output text"
+            ),
+        )
