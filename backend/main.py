@@ -50,9 +50,9 @@ _encoder = EventEncoder()
 # Populated when a run pauses on confirm_listing_change; consumed on resume.
 _paused_runs: dict[str, dict] = {}
 
-# run_id -> {"agent_runtime_arn", "session_id"}. Populated the instant a
-# run starts streaming, popped when it finishes/errors/is stopped. This
-# is what /agui/stop looks up to know WHICH Runtime session to actually
+# run_id -> {"harness_arn", "session_id"}. Populated the instant a run
+# starts streaming, popped when it finishes/errors/is stopped. This is
+# what /agui/stop looks up to know WHICH harness session to actually
 # halt server-side via StopRuntimeSession -- the run_id the frontend
 # already tracks is not itself a valid AWS identifier for that call.
 _active_runs: dict[str, dict] = {}
@@ -248,7 +248,6 @@ async def agui_endpoint(request: Request):
     body = await request.json()
 
     harness_arn = config.GROUP_TO_HARNESS_ARN[actor["group"]]
-    agent_runtime_arn = config.GROUP_TO_AGENT_RUNTIME_ARN[actor["group"]]
     thread_id = body.get("thread_id") or str(uuid.uuid4())
     run_id = body.get("run_id") or str(uuid.uuid4())
     # runtimeSessionId must be >=33 chars; pad thread_id if needed.
@@ -257,7 +256,7 @@ async def agui_endpoint(request: Request):
     resume = body.get("resume")
 
     def event_stream():
-        _active_runs[run_id] = {"agent_runtime_arn": agent_runtime_arn, "session_id": session_id}
+        _active_runs[run_id] = {"harness_arn": harness_arn, "session_id": session_id}
         try:
             if resume:
                 paused = _paused_runs.pop(run_id, None)
@@ -325,7 +324,7 @@ async def agui_stop(request: Request):
     if active is None:
         raise HTTPException(404, "No active run with that run_id (it may have already finished).")
     try:
-        harness_client.stop_session(active["agent_runtime_arn"], active["session_id"])
+        harness_client.stop_session(active["harness_arn"], active["session_id"])
     except Exception as e:
         log.warning("StopRuntimeSession failed for run %s: %s", run_id, e)
         raise HTTPException(502, f"Failed to stop the run: {e}")

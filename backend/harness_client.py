@@ -60,14 +60,24 @@ def resume_with_tool_results(
     )
 
 
-def stop_session(agent_runtime_arn: str, session_id: str) -> dict:
-    """Stops the harness's underlying Runtime session server-side, via
-    StopRuntimeSession -- a genuine AWS-side halt of the in-flight run,
-    not merely the client giving up on reading the stream. Requires the
-    Runtime ARN (see config.py's note on why this differs from the
-    Harness ARN used everywhere else in this module).
+def stop_session(harness_arn: str, session_id: str) -> dict:
+    """Stops an in-flight harness run server-side via StopRuntimeSession --
+    a genuine AWS-side halt, not merely the client giving up on reading
+    the stream.
+
+    Confirmed live against the real deployed harness: StopRuntimeSession's
+    agentRuntimeArn parameter must be the HARNESS's own ARN (the same one
+    passed to invoke_harness above), not the separate, similarly-named
+    'agentRuntimeArn' field agentcore status reports nested under each
+    harness -- passing THAT one is explicitly rejected by AWS with
+    "is managed by a harness and cannot be invoked directly. Use the
+    StopRuntimeSession API with the relevant harness ID instead", which
+    is exactly what this does. An earlier version of this code plumbed
+    that separate nested ARN through as a distinct config value; it was
+    unnecessary and wrong -- removed after this was verified live,
+    3 consecutive runs.
     """
     return _client.stop_runtime_session(
-        agentRuntimeArn=agent_runtime_arn,
+        agentRuntimeArn=harness_arn,
         runtimeSessionId=session_id,
     )

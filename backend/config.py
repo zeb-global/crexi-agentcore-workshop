@@ -17,28 +17,6 @@ BROKER_HARNESS_ARN = os.environ.get(
     "arn:aws:bedrock-agentcore:us-west-2:347272280436:harness/crexiWorkshopV2_brokerAgent-Zh8tLOhxvX",
 )
 
-# The Harness ARN and its underlying Runtime ARN are DIFFERENT resources
-# with different ARN resource types (harness/... vs runtime/harness_...)
-# -- confirmed against the actual bedrock-agentcore service model:
-# InvokeHarness's harnessArn parameter is typed HarnessArn, while
-# StopRuntimeSession's agentRuntimeArn parameter is a separate, plain
-# String shape referring to the Runtime AgentCore provisions underneath
-# a harness. Stopping an in-flight run requires THIS arn, not the
-# harness's own -- see harness_client.stop_session(). Written to
-# backend/.env by scripts/wire-backend-env.sh, which reads
-# `agentRuntimeArn` out of `agentcore status --json`'s
-# deployedState.targets.<id>.resources.harnesses.<name> entry -- these
-# placeholder defaults are NOT a valid target for anyone to run
-# against, same as the two harness ARN placeholders above.
-INVESTOR_AGENT_RUNTIME_ARN = os.environ.get(
-    "INVESTOR_AGENT_RUNTIME_ARN",
-    "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/harness_placeholder-0000000000",
-)
-BROKER_AGENT_RUNTIME_ARN = os.environ.get(
-    "BROKER_AGENT_RUNTIME_ARN",
-    "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/harness_placeholder-0000000001",
-)
-
 COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "us-west-2_KYy68lcCk")
 COGNITO_APP_CLIENT_ID = os.environ.get("COGNITO_APP_CLIENT_ID", "4fg4n26sc6adgghku4vcdulnod")
 
@@ -73,10 +51,4 @@ CORS_ALLOWED_ORIGINS = [
 GROUP_TO_HARNESS_ARN = {
     "investors": INVESTOR_HARNESS_ARN,
     "brokers": BROKER_HARNESS_ARN,
-}
-
-# Same idea, for the underlying Runtime ARN Stop needs.
-GROUP_TO_AGENT_RUNTIME_ARN = {
-    "investors": INVESTOR_AGENT_RUNTIME_ARN,
-    "brokers": BROKER_AGENT_RUNTIME_ARN,
 }

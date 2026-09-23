@@ -25,27 +25,6 @@ resources = json.loads(sys.argv[1])['resources']
 print(next(r['identifier'] for r in resources if r['name'].startswith('brokerAgent')))
 " "$STATUS_JSON")
 
-# The Harness ARN and its underlying Runtime ARN are different resources
-# (see backend/config.py's note) -- StopRuntimeSession, used by the
-# frontend's Stop button, needs the LATTER. It lives one level deeper in
-# the same status JSON, under deployedState, not the flat resources[]
-# array the harness ARNs above come from.
-INVESTOR_RUNTIME_ARN=$(python3 -c "
-import json, sys
-data = json.loads(sys.argv[1])
-harnesses = data['deployedState']['targets'][sys.argv[2]]['resources']['harnesses']
-name = next(n for n in harnesses if n.startswith('investorAgent'))
-print(harnesses[name]['agentRuntimeArn'])
-" "$STATUS_JSON" "$WORKSHOP_ID")
-
-BROKER_RUNTIME_ARN=$(python3 -c "
-import json, sys
-data = json.loads(sys.argv[1])
-harnesses = data['deployedState']['targets'][sys.argv[2]]['resources']['harnesses']
-name = next(n for n in harnesses if n.startswith('brokerAgent'))
-print(harnesses[name]['agentRuntimeArn'])
-" "$STATUS_JSON" "$WORKSHOP_ID")
-
 IDENTITY_STACK="Crexi${WORKSHOP_ID}Identity"
 USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK" \
   --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)
@@ -57,8 +36,6 @@ WORKSHOP_ID=${WORKSHOP_ID}
 AWS_REGION=${REGION}
 INVESTOR_HARNESS_ARN=${INVESTOR_ARN}
 BROKER_HARNESS_ARN=${BROKER_ARN}
-INVESTOR_AGENT_RUNTIME_ARN=${INVESTOR_RUNTIME_ARN}
-BROKER_AGENT_RUNTIME_ARN=${BROKER_RUNTIME_ARN}
 COGNITO_USER_POOL_ID=${USER_POOL_ID}
 COGNITO_APP_CLIENT_ID=${APP_CLIENT_ID}
 EOF
