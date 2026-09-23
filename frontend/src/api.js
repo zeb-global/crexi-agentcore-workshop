@@ -3,7 +3,11 @@
 // fetch() response body as a stream and split it on the SSE "\n\n"
 // event delimiter ourselves.
 
-const API_BASE = "http://localhost:8000";
+// Overridable via a .env file read by Vite (VITE_-prefixed vars are
+// inlined at build time) -- defaults to the Makefile's own local dev
+// port so nothing breaks for the common case, but is not hardcoded for
+// anyone running the backend on a different host/port.
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 export async function login(username, password) {
   const res = await fetch(`${API_BASE}/auth/login`, {
@@ -20,9 +24,12 @@ export async function login(username, password) {
 
 /**
  * Streams one /agui turn. Calls onEvent(parsedJson) for every AG-UI
- * event as it arrives. Resolves when the stream ends.
+ * event as it arrives. Resolves when the stream ends. Pass an
+ * AbortSignal via opts.signal to support a real Stop button --
+ * aborting here only stops the CLIENT reading the stream; call
+ * stopRun() too for a genuine server-side halt of the harness run.
  */
-export async function streamAgui(accessToken, payload, onEvent) {
+export async function streamAgui(accessToken, payload, onEvent, opts = {}) {
   const res = await fetch(`${API_BASE}/agui`, {
     method: "POST",
     headers: {
@@ -30,6 +37,7 @@ export async function streamAgui(accessToken, payload, onEvent) {
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(payload),
+    signal: opts.signal,
   });
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => res.statusText);
@@ -62,15 +70,16 @@ export async function streamAgui(accessToken, payload, onEvent) {
   }
 }
 
-export function sendMessage(accessToken, { threadId, runId, text }, onEvent) {
+export function sendMessage(accessToken, { threadId, runId, text }, onEvent, opts) {
   return streamAgui(
     accessToken,
     { thread_id: threadId, run_id: runId, messages: [{ role: "user", content: text }] },
-    onEvent
+    onEvent,
+    opts
   );
 }
 
-export function resumeInterrupt(accessToken, { threadId, runId, interruptId, approved }, onEvent) {
+export function resumeInterrupt(accessToken, { threadId, runId, interruptId, approved }, onEvent, opts) {
   return streamAgui(
     accessToken,
     {
@@ -78,6 +87,44 @@ export function resumeInterrupt(accessToken, { threadId, runId, interruptId, app
       run_id: runId,
       resume: [{ interrupt_id: interruptId, status: "resolved", payload: { approved } }],
     },
-    onEvent
+    onEvent,
+    opts
   );
+}
+
+/**
+ * Genuinely halts an in-flight run server-side via StopRuntimeSession --
+ * not merely abandoning the SSE stream client-side, which would leave
+ * the harness (and its billed compute) running unattended.
+ */
+export async function stopRun(accessToken, runId) {
+  const res = await fetch(`${API_BASE}/agui/stop`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ run_id: runId }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`/agui/stop failed: ${text}`);
+  }
+  return res.json();
+}
+
+/**
+ * The default browse-grid population on login -- investors get the
+ * whole market, brokers get just their own listings (the backend
+ * decides which, from the caller's real Cognito group).
+ */
+export async function fetchListings(accessToken) {
+  const res = await fetch(`${API_BASE}/listings`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`/listings failed: ${text}`);
+  }
+  return res.json();
 }

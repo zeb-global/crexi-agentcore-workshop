@@ -20,34 +20,12 @@
     {
       "type": "agentcore_code_interpreter",
       "name": "code-interpreter"
-    },
-    {
-      "type": "inline_function",
-      "name": "submit_underwriting_result",
-      "config": {
-        "inlineFunction": {
-          "description": "Submit the underwriting comparison JSON exactly as printed by the code-interpreter tool's stdout on its last line. You MUST have called code-interpreter earlier in THIS turn before calling this -- the backend verifies this and will reject the call otherwise. Never construct this payload yourself; copy it verbatim from the code-interpreter tool result.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "comparison": {
-                "type": "object",
-                "description": "The exact JSON object code-interpreter printed (type, criteria, properties, recommended), parsed."
-              }
-            },
-            "required": [
-              "comparison"
-            ]
-          }
-        }
-      }
     }
   ],
   "skills": [],
   "allowedTools": [
     "@market-data/*",
-    "@code-interpreter",
-    "@submit_underwriting_result"
+    "@code-interpreter"
   ],
   "memory": {
     "mode": "managed",

@@ -38,7 +38,7 @@ log = logging.getLogger("crexi-backend")
 app = FastAPI(title="CREXi Workshop Backend")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=config.CORS_ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -50,22 +50,17 @@ _encoder = EventEncoder()
 # Populated when a run pauses on confirm_listing_change; consumed on resume.
 _paused_runs: dict[str, dict] = {}
 
-# run_id -> True once code-interpreter has completed ANYWHERE in this run.
-# translate_stream()'s own code_interpreter_completed is scoped to a single
-# harness_client.invoke()/resume_with_tool_results() stream -- it resets to
-# False on every new stream. If the model splits code-interpreter and
-# submit_underwriting_result across separate turns (each its own stream --
-# and the system prompt used to explicitly ask for this), the per-stream
-# flag alone would forget code-interpreter ever ran and wrongly reject the
-# submit. This dict makes "did code-interpreter complete" a per-RUN fact
-# instead, independent of how many streams the run is split across. Popped
-# when the run truly finishes to avoid unbounded growth.
-_code_interpreter_completed_runs: dict[str, bool] = {}
+# run_id -> {"agent_runtime_arn", "session_id"}. Populated the instant a
+# run starts streaming, popped when it finishes/errors/is stopped. This
+# is what /agui/stop looks up to know WHICH Runtime session to actually
+# halt server-side via StopRuntimeSession -- the run_id the frontend
+# already tracks is not itself a valid AWS identifier for that call.
+_active_runs: dict[str, dict] = {}
 
 # Catches a model that answers an underwriting-style comparison in plain
-# prose without ever calling code-interpreter or submit_underwriting_result
-# at all -- the submit_underwriting_result gate only fires if the model
-# actually calls it, which is not guaranteed (observed live: the model can
+# prose without ever calling code-interpreter at all -- the comparison
+# card only renders if code-interpreter's own stdout contains the JSON
+# payload, which is not guaranteed (observed live: the model can
 # just narrate an answer and end the turn with stopReason=end_turn,
 # touching no tool whatsoever). Requiring BOTH "cap rate" and a second,
 # more specific underwriting term keeps this from false-positiving on a
@@ -122,6 +117,14 @@ def _drain_and_resolve(
     transparently (loops back into the harness with the credential and
     keeps draining); stops for real -- emitting a genuine Interrupt --
     on confirm_listing_change, which needs an actual human answer.
+
+    Underwriting comparisons need no separate confirmation tool call:
+    translate_stream() parses the JSON straight out of code-interpreter's
+    own stdout the moment its result streams back, so there is no second
+    tool call whose sequencing could be gotten wrong, rejected, and
+    retried -- the whole class of "submit_underwriting_result called
+    before code-interpreter finished" failure no longer has a place to
+    occur.
     """
     gen = translate_stream(harness_stream, thread_id=thread_id, run_id=run_id, emit_run_started=emit_run_started)
     result = None
@@ -134,18 +137,30 @@ def _drain_and_resolve(
     if result is None:
         return
 
-    if result.get("code_interpreter_completed"):
-        _code_interpreter_completed_runs[run_id] = True
+    comparison = result.get("underwriting_comparison")
+    if comparison:
+        yield _encoder.encode(StateDeltaEvent(
+            delta=[{"op": "replace", "path": "/comparison", "value": comparison}]
+        ))
+
+    active_listings = result.get("active_listings")
+    if active_listings is not None:
+        # Mirrors whatever the agent's own search_listings/get_listing
+        # call just returned into the browse grid, live -- the grid
+        # reacts to the conversation, it is not an independent filter UI.
+        yield _encoder.encode(StateDeltaEvent(
+            delta=[{"op": "replace", "path": "/activeListings", "value": active_listings}]
+        ))
 
     if result.get("outcome") == "error":
         log.error("Harness error for run %s: %s", run_id, result.get("message"))
-        _code_interpreter_completed_runs.pop(run_id, None)
         return
 
     if result.get("outcome") == "finished":
         if (
             underwriting_retries_left > 0
-            and not _code_interpreter_completed_runs.get(run_id, False)
+            and not comparison
+            and not result.get("code_interpreter_completed")
             and _looks_like_unverified_underwriting(result.get("full_text", ""))
         ):
             log.warning(
@@ -156,9 +171,8 @@ def _drain_and_resolve(
                 "Your last response gave cap rate / DSCR / cash-on-cash figures without "
                 "calling any tool at all. That is not permitted. Using the same "
                 "properties and NOI figures you already have, call the code-interpreter "
-                "tool to actually execute the underwriting calculation, then call "
-                "submit_underwriting_result with its exact output. Do not repeat the "
-                "same figures as prose again."
+                "tool to actually execute the underwriting calculation and print its "
+                "result. Do not repeat the same figures as prose again."
             )
             next_stream = harness_client.invoke(
                 harness_arn, session_id, actor["sub"],
@@ -170,56 +184,18 @@ def _drain_and_resolve(
             )
             return
         yield _encoder.encode(RunFinishedEvent(thread_id=thread_id, run_id=run_id, outcome=RunFinishedSuccessOutcome()))
-        _code_interpreter_completed_runs.pop(run_id, None)
         return
 
     if result.get("outcome") != "pending_tools":
         return
 
     pending = result["pending"]
-    code_interpreter_completed = _code_interpreter_completed_runs.get(run_id, False)
     auto_results = []
     human_needed = []
     for p in pending:
         if p["name"] == "get_legacy_credentials":
             cred = confirmation.resolve_legacy_credentials(actor["username"])
             auto_results.append({"toolUseId": p["toolUseId"], "result": cred, "status": "success"})
-
-        elif p["name"] == "submit_underwriting_result":
-            # The gate: this call is only trusted if a real code-interpreter
-            # tool call completed earlier in THIS SAME stream (see
-            # agui_translate.py). A model that tries to skip straight to
-            # this call -- typing the numbers itself instead of running
-            # them -- gets rejected with an error toolResult and can
-            # correct itself in the same turn, since the harness continues
-            # normally after any toolResult, success or error.
-            comparison = p["input"].get("comparison")
-            if not code_interpreter_completed:
-                log.warning("Rejected submit_underwriting_result for run %s: code-interpreter did not complete this turn", run_id)
-                auto_results.append({
-                    "toolUseId": p["toolUseId"],
-                    "status": "error",
-                    "result": {
-                        "error": "Rejected: code-interpreter was not called (or did not finish) this "
-                                 "turn. Call code-interpreter to actually execute the underwriting, "
-                                 "then call submit_underwriting_result again with its exact output."
-                    },
-                })
-            elif not isinstance(comparison, dict) or comparison.get("type") != "underwriting_comparison" or "properties" not in comparison:
-                auto_results.append({
-                    "toolUseId": p["toolUseId"],
-                    "status": "error",
-                    "result": {
-                        "error": "Rejected: 'comparison' is not a valid underwriting_comparison "
-                                 "object. It must be the exact JSON code-interpreter printed, parsed, "
-                                 "not something you composed yourself."
-                    },
-                })
-            else:
-                yield _encoder.encode(StateDeltaEvent(
-                    delta=[{"op": "replace", "path": "/comparison", "value": comparison}]
-                ))
-                auto_results.append({"toolUseId": p["toolUseId"], "status": "success", "result": {"received": True}})
 
         else:
             human_needed.append(p)
@@ -272,6 +248,7 @@ async def agui_endpoint(request: Request):
     body = await request.json()
 
     harness_arn = config.GROUP_TO_HARNESS_ARN[actor["group"]]
+    agent_runtime_arn = config.GROUP_TO_AGENT_RUNTIME_ARN[actor["group"]]
     thread_id = body.get("thread_id") or str(uuid.uuid4())
     run_id = body.get("run_id") or str(uuid.uuid4())
     # runtimeSessionId must be >=33 chars; pad thread_id if needed.
@@ -280,53 +257,79 @@ async def agui_endpoint(request: Request):
     resume = body.get("resume")
 
     def event_stream():
-        if resume:
-            paused = _paused_runs.pop(run_id, None)
-            if paused is None:
-                yield _encoder.encode(RunFinishedEvent(thread_id=thread_id, run_id=run_id, outcome={"type": "error"}))
+        _active_runs[run_id] = {"agent_runtime_arn": agent_runtime_arn, "session_id": session_id}
+        try:
+            if resume:
+                paused = _paused_runs.pop(run_id, None)
+                if paused is None:
+                    yield _encoder.encode(RunFinishedEvent(thread_id=thread_id, run_id=run_id, outcome={"type": "error"}))
+                    return
+                entry = resume[0]
+                if entry.get("status") == "resolved" and entry.get("payload", {}).get("approved"):
+                    result = confirmation.mint_price_change_approval(
+                        actor=paused["actor"]["username"],
+                        listing_id=paused["listing_id"],
+                        old_price=paused["old_price"],
+                        new_price=paused["new_price"],
+                        session_id=paused["session_id"],
+                    )
+                else:
+                    result = confirmation.decline_price_change()
+                next_stream = harness_client.resume_with_tool_results(
+                    paused["harness_arn"], paused["session_id"], paused["actor"]["sub"],
+                    [{"toolUseId": paused["pending_tool_use_id"], "result": result, "status": "success"}],
+                )
+                yield from _drain_and_resolve(
+                    paused["harness_arn"], paused["session_id"], thread_id, paused["actor"], run_id, next_stream,
+                    emit_run_started=False,
+                )
                 return
-            entry = resume[0]
-            if entry.get("status") == "resolved" and entry.get("payload", {}).get("approved"):
-                result = confirmation.mint_price_change_approval(
-                    actor=paused["actor"]["username"],
-                    listing_id=paused["listing_id"],
-                    old_price=paused["old_price"],
-                    new_price=paused["new_price"],
-                    session_id=paused["session_id"],
-                )
-            else:
-                result = confirmation.decline_price_change()
-            next_stream = harness_client.resume_with_tool_results(
-                paused["harness_arn"], paused["session_id"], paused["actor"]["sub"],
-                [{"toolUseId": paused["pending_tool_use_id"], "result": result, "status": "success"}],
+
+            messages_in = body.get("messages", [])
+            user_text = ""
+            for m in reversed(messages_in):
+                if m.get("role") == "user":
+                    content = m.get("content", "")
+                    user_text = content if isinstance(content, str) else next(
+                        (c.get("text", "") for c in content if isinstance(c, dict)), ""
+                    )
+                    break
+
+            model_override = body.get("forwarded_props", {}).get("modelOverride")
+            pricing.set_current_model((model_override or {}).get("bedrockModelConfig", {}).get("modelId"))
+
+            raw_stream = harness_client.invoke(
+                harness_arn, session_id, actor["sub"],
+                messages=[{"role": "user", "content": [{"text": user_text}]}],
+                model_override=model_override,
             )
-            yield from _drain_and_resolve(
-                paused["harness_arn"], paused["session_id"], thread_id, paused["actor"], run_id, next_stream,
-                emit_run_started=False,
-            )
-            return
-
-        messages_in = body.get("messages", [])
-        user_text = ""
-        for m in reversed(messages_in):
-            if m.get("role") == "user":
-                content = m.get("content", "")
-                user_text = content if isinstance(content, str) else next(
-                    (c.get("text", "") for c in content if isinstance(c, dict)), ""
-                )
-                break
-
-        model_override = body.get("forwarded_props", {}).get("modelOverride")
-        pricing.set_current_model((model_override or {}).get("bedrockModelConfig", {}).get("modelId"))
-
-        raw_stream = harness_client.invoke(
-            harness_arn, session_id, actor["sub"],
-            messages=[{"role": "user", "content": [{"text": user_text}]}],
-            model_override=model_override,
-        )
-        yield from _drain_and_resolve(harness_arn, session_id, thread_id, actor, run_id, raw_stream, emit_run_started=True)
+            yield from _drain_and_resolve(harness_arn, session_id, thread_id, actor, run_id, raw_stream, emit_run_started=True)
+        finally:
+            _active_runs.pop(run_id, None)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.post("/agui/stop")
+async def agui_stop(request: Request):
+    """Genuinely halts an in-flight run server-side via
+    StopRuntimeSession -- not merely the client abandoning the SSE
+    stream, which would leave the harness (and its billed compute)
+    running unattended. Looks the run up in _active_runs, which is only
+    populated while a stream from THIS run_id is actually in flight.
+    """
+    _require_actor(request)
+    body = await request.json()
+    run_id = body.get("run_id")
+    active = _active_runs.get(run_id)
+    if active is None:
+        raise HTTPException(404, "No active run with that run_id (it may have already finished).")
+    try:
+        harness_client.stop_session(active["agent_runtime_arn"], active["session_id"])
+    except Exception as e:
+        log.warning("StopRuntimeSession failed for run %s: %s", run_id, e)
+        raise HTTPException(502, f"Failed to stop the run: {e}")
+    return {"stopped": True}
 
 
 @app.get("/artifacts/{key:path}")
@@ -356,3 +359,37 @@ async def browser_live_view(request: Request):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+def _decimals_to_native(obj):
+    from decimal import Decimal
+    if isinstance(obj, list):
+        return [_decimals_to_native(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _decimals_to_native(v) for k, v in obj.items()}
+    if isinstance(obj, Decimal):
+        return int(obj) if obj == obj.to_integral_value() else float(obj)
+    return obj
+
+
+@app.get("/listings")
+async def list_listings(request: Request):
+    """Default grid population on login, straight from DynamoDB -- same
+    table the market-data MCP's own search_listings reads, and the same
+    privacy rule applied (NOI is never exposed here; it only exists in
+    a listing's T-12 PDF, retrievable only via get_document_text).
+
+    Investors see the whole market; brokers default to just their own
+    listings (brokerId == their username) -- mirrors how a broker
+    actually uses the product: managing what they own, not browsing
+    the whole market like an investor does.
+    """
+    actor = _require_actor(request)
+    import boto3
+    dynamodb = boto3.resource("dynamodb", region_name=config.AWS_REGION)
+    table = dynamodb.Table(config.LISTINGS_TABLE)
+    items = table.scan().get("Items", [])
+    items = [{k: v for k, v in item.items() if k != "noi"} for item in items]
+    if actor["group"] == "brokers":
+        items = [item for item in items if item.get("brokerId") == actor["username"]]
+    return {"listings": _decimals_to_native(items)}

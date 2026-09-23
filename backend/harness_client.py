@@ -58,3 +58,16 @@ def resume_with_tool_results(
         messages=[{"role": "user", "content": content}],
         tools_override=tools_override,
     )
+
+
+def stop_session(agent_runtime_arn: str, session_id: str) -> dict:
+    """Stops the harness's underlying Runtime session server-side, via
+    StopRuntimeSession -- a genuine AWS-side halt of the in-flight run,
+    not merely the client giving up on reading the stream. Requires the
+    Runtime ARN (see config.py's note on why this differs from the
+    Harness ARN used everywhere else in this module).
+    """
+    return _client.stop_runtime_session(
+        agentRuntimeArn=agent_runtime_arn,
+        runtimeSessionId=session_id,
+    )
