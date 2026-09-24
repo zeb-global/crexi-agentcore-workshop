@@ -41,6 +41,60 @@ aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Tools" \
 You should see `MarketDataFunctionArn` and `ListingOpsFunctionArn` — two Lambda functions you're about to wire up
 as Gateway targets. Keep this command handy; you'll pull these ARNs again in a moment.
 
+### What's actually in each of the 5 stacks
+
+`make bootstrap` deployed five CDK stacks (`Crexi${WORKSHOP_ID}<Name>`). Nothing here is AgentCore-native — this
+is plain AWS infrastructure that the harnesses you build in the phases below will call into. Worth knowing what
+each resource is for before you start wiring Gateways to it.
+
+**Data** — the listings themselves and everything that reads/writes them.
+
+| Resource | Purpose | Used by |
+| --- | --- | --- |
+| DynamoDB `crexi-<id>-listings` | The listings — market, asset type, units, asking price, value-add flag. Has a GSI on market+assetType sorted by price. | `mcp-market-data` (search/get), `mcp-listing-ops` (price writes) |
+| DynamoDB `crexi-<id>-changelog` | Append-only history of price/field changes per listing. | `mcp-listing-ops` (writes on every change), the `get_change_log` tool |
+| DynamoDB `crexi-<id>-approvals` | Short-lived (TTL) approval tokens minted after a broker confirms a price change, so a write can't happen without one. | Backend (`confirmation.py` mints), `mcp-listing-ops` (validates before writing) |
+| S3 `crexi-<id>-docs-<account>-<region>` | T-12 operating statements, offering memoranda, comps JSON — the PDFs `get_document_text` extracts from. | `mcp-market-data` |
+| Lambda `crexi-<id>-seed-data` (custom resource) | Loads the Columbus listings/comps and generates the T-12/OM PDFs on first deploy, so the account starts in "opening state" with no separate seed step required. | Runs once at `cdk deploy`; `make seed` re-runs it |
+
+**Identity** — who dana and marcus actually are, at the AWS level.
+
+| Resource | Purpose | Used by |
+| --- | --- | --- |
+| Cognito User Pool `crexi-<id>-users` | The inbound identity for both harnesses — who dana/marcus sign in as. | Backend JWT auth, both harnesses' `customJwtAuthorizer` |
+| App client `crexi-<id>-app` | The main app's client (no secret, user/SRP auth) the frontend/backend use to sign users in. | Frontend login, backend token verification |
+| `investors` / `brokers` Cognito groups | Separates dana from marcus at the identity layer, not just by username. | Backend routes broker-only actions by group membership |
+| Second app client + Hosted UI domain `crexi-<id>-legacy-oauth` | Stands in for "the legacy deal desk's own OAuth provider" — same pool, same identities, but a separate client with the `authorization_code` grant and a real secret. | Phase 3's workload identity + OAuth2 credential provider |
+| Lambda `crexi-<id>-seed-users` (custom resource) | Creates dana/marcus, sets their password (derived from `WORKSHOP_SECRET`), adds them to their groups. | Runs once at `cdk deploy` |
+
+**Legacy** — the no-API system the Browser tool has to actually navigate.
+
+| Resource | Purpose | Used by |
+| --- | --- | --- |
+| Lambda `crexi-<id>-legacy-deal-desk` + Function URL | The legacy app itself — a login-gated form with no API. Verifies OAuth tokens issued by the Legacy OAuth app client; never participates in the OAuth dance itself. | Broker harness's Browser tool (Phase 2), Phase 3's OAuth flow |
+| DynamoDB `crexi-<id>-legacy-creds` | The legacy app's own login credentials — deliberately separate from Cognito. | `legacy-deal-desk` Lambda only |
+| DynamoDB `crexi-<id>-legacy-records` | Rent roll, concessions, deferred maintenance — data that exists nowhere else, which is the point of the Browser-tool exercise. | `legacy-deal-desk` Lambda only |
+| Lambda `crexi-<id>-seed-legacy` (custom resource) | Seeds the legacy credentials + records tables at deploy time. | Runs once at `cdk deploy`; `make seed` re-runs it |
+
+**Tools** — the two Lambdas that become MCP tools once you wire them to a Gateway.
+
+| Resource | Purpose | Used by |
+| --- | --- | --- |
+| Lambda `crexi-<id>-mcp-market-data` | Read-only tools: `search_listings`, `get_listing`, `get_market_comps`, `list_property_documents`, `get_document_text`. | Investor harness, via `gw-readonly` (Phase 1) |
+| Lambda `crexi-<id>-mcp-listing-ops` | Write tool: `update_listing_price` (approval-token gated), plus `get_change_log`. | Broker harness, via `gw-ops` (Phase 2) |
+
+These two exist as plain Lambda functions here — the Gateway/target wiring that turns them into MCP tools happens
+later, by hand, in `agentcore/agentcore.json` (Phases 1 and 2), not in this stack.
+
+**Observability** — one account-wide setting, not per-participant.
+
+| Resource | Purpose | Used by |
+| --- | --- | --- |
+| CloudWatch Transaction Search (account-level) | Makes AgentCore traces (model calls, memory ops, Gateway/tool calls, Browser and Code Interpreter sessions) queryable in the GenAI Observability dashboard, with zero instrumentation code. | Every harness invocation, from your first deploy on |
+
+One-time and idempotent — only the first participant in a shared account actually creates it; this stack checks
+first and skips itself if it's already active.
+
 ---
 
 ## Phase 0 — Bootstrap the AgentCore project
@@ -333,7 +387,34 @@ agentcore invoke --target $WORKSHOP_ID --harness investorAgent_${WORKSHOP_ID} \
 ```
 
 You should get back real listings, with a `search_listings` tool call visible in the trace — not a hallucinated
-answer.
+answer. Copy the `Session:` ID that `agentcore invoke` prints at the end — you need it in the next step.
+
+### 1.7 — Run a live evaluation against that session
+
+AgentCore Evaluations can score a real session on demand, without deploying anything — this is the fastest way to
+see the service work. First get the investor harness's actual Runtime ARN (evaluators run against a Runtime ARN,
+not the harness name):
+
+```bash
+agentcore status --target $WORKSHOP_ID --type harness --json
+# copy investorAgent_${WORKSHOP_ID}'s "agentRuntimeArn"
+```
+
+> **Fill in before running:** replace both placeholders below — `<agentRuntimeArn>` with the value you just copied,
+> and `<session ID>` with the one 1.6's `agentcore invoke` printed.
+
+```bash
+agentcore run eval --runtime-arn "<agentRuntimeArn>" --region $AWS_REGION \
+  --evaluator Builtin.Helpfulness --session-id "<session ID>"
+```
+
+This prints a score (e.g. `Builtin.Helpfulness: 1.00`) and writes a JSON results file — no `agentcore add
+evaluator`, no deploy step. That's deliberate: `Builtin.*` evaluators need none of that.
+
+**Don't reach for `agentcore add evaluator` here to try a custom evaluator instead** — it registers in
+`agentcore.json` and `agentcore status` will even show it, but this project's generated CDK stack only wires
+`harnesses` and `agentCoreGateways` into the actual deploy, so a custom evaluator never reaches AWS. Stick to
+`Builtin.*` evaluators for now; see the Troubleshooting table below if you want to understand why.
 
 ---
 
@@ -749,6 +830,8 @@ result the model makes for that turn — check the tool `name` in the first `con
 if it's honest about not having a tool rather than inventing data, that's also a config gap, not a prompt problem.
 
 - [ ] **Investor**: "What multi-family listings are available in Columbus?" returns real listings.
+- [ ] **Investor**: `agentcore run eval` (step 1.7) against that session prints a `Builtin.Helpfulness` score and
+      writes a results JSON file.
 - [ ] **Investor**: "Run underwriting on `<two properties>`, minimum cap rate 6.5%." goes through a visible Code
       Interpreter tool call, not just the model typing numbers.
 - [ ] **Broker**: "What listings do I have?" returns only `marcus`'s own listings.
@@ -786,6 +869,7 @@ price-change approvals), so the real bearer token never lands in an access log o
 | `agentcore deploy` fails with `Property value [...] does not match pattern ^arn:aws...` on a harness's `GatewayArn` | You passed the gateway's bare name/id to `--gateway-arn` in `agentcore add harness` instead of the full ARN from 1.4's `identifier` field. Since deploy failed before AWS created anything, remove the bad harness from local config and re-add it: `agentcore remove harness --name investorAgent_${WORKSHOP_ID} --yes`, then re-run `agentcore add harness` with the correct full ARN and redeploy. |
 | The harness deploys and responds, but invents listings instead of calling `search_listings` (or says outright it has no data-search tool) | Its gateway tool's `name` in `harness.json` doesn't match the `@`-prefixed reference in `allowedTools` (defaults to `"gateway"`, but `allowedTools` says `@market-data/*`) — the Gateway's sub-tools never reach the model. Rename the tool entry's `"name"` to `"market-data"` per step 1.5 and redeploy. Confirm with `agentcore invoke ... --verbose` that the trace shows a `market-data___search_listings` (or `x_amz_bedrock_agentcore_search`) call, not just `code_interpreter`. |
 | `make dev` says `backend/.env not found` | Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` — Phase 4, above. Nothing writes this file automatically on this branch. |
+| `agentcore add evaluator` succeeds and `agentcore status` shows it, but the evaluator never shows up in AWS | Confirmed gap on this branch: the CDK project `agentcore create` generates only wires `harnesses` and `agentCoreGateways` into the actual synth/deploy — `evaluators` register in `agentcore.json` but never reach AWS via `agentcore deploy`. Use a `Builtin.*` evaluator instead (step 1.7) — it needs no deploy step at all. |
 
 If you get well and truly stuck, the `reference` branch has a fully working, automated version of everything
 above — useful as an answer key, not as something to copy wholesale (the point is building it yourself).

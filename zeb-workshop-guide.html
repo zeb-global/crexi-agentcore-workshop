@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentCore Build Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --lime:#CEF79F; --lime-deep:#9FD16A;
+    --charcoal:#222F30; --charcoal-2:#2A383A; --beige:#E7E8E1; --ink:#191919;
+    --card:#FFFFFF; --border:rgba(25,25,25,.12); --muted:rgba(25,25,25,.62);
+    --font-display:'Manrope',Arial,sans-serif;
+    --font-sans:'Inter',system-ui,-apple-system,sans-serif;
+    --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+    --radius-sm:6px; --radius-md:12px; --radius-lg:20px;
+    --nav-w:280px; --topbar-h:64px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; background:var(--beige); color:var(--ink);
+    font-family:var(--font-sans); font-weight:400; line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{font-family:var(--font-display); font-weight:600; letter-spacing:-.01em; color:var(--charcoal); text-wrap:balance; margin:0;}
+  a{color:var(--charcoal);}
+  code, pre, .mono{font-family:var(--font-mono);}
+  p{margin:0 0 12px;}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; height:var(--topbar-h); z-index:50;
+    background:var(--charcoal); color:var(--beige);
+    display:flex; align-items:center; gap:16px;
+    padding:0 clamp(16px,3vw,28px);
+  }
+  .topbar .logo{height:22px; width:auto; flex:0 0 auto;}
+  .topbar .divider{width:1px; height:24px; background:rgba(231,232,225,.22); flex:0 0 auto;}
+  .topbar .title-block{flex:0 0 auto; display:flex; flex-direction:column; gap:1px; min-width:0;}
+  .topbar .title-block .eyebrow{font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--lime); font-weight:600;}
+  .topbar .title-block .name{font-family:var(--font-display); font-size:14px; font-weight:600; color:var(--beige); white-space:nowrap;}
+  .topbar .progress-wrap{flex:1 1 auto; display:flex; align-items:center; gap:12px; min-width:0; max-width:520px; margin-left:auto;}
+  .progress-track{flex:1 1 auto; height:6px; border-radius:100px; background:rgba(231,232,225,.16); overflow:hidden;}
+  .progress-fill{height:100%; width:0%; background:var(--lime); border-radius:100px; transition:width .35s cubic-bezier(.22,1,.36,1);}
+  .progress-label{font-size:12px; font-weight:600; color:var(--beige); white-space:nowrap; font-variant-numeric:tabular-nums;}
+  .nav-toggle{
+    display:none; flex:0 0 auto; background:transparent; border:1px solid rgba(231,232,225,.25);
+    color:var(--beige); border-radius:100px; width:36px; height:36px; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .nav-toggle svg{width:16px; height:16px;}
+
+  /* ---------- layout ---------- */
+  .shell{display:flex; padding-top:var(--topbar-h); min-height:100vh;}
+  .sidenav{
+    position:fixed; top:var(--topbar-h); left:0; bottom:0; width:var(--nav-w);
+    background:var(--charcoal-2); border-right:1px solid rgba(231,232,225,.08);
+    overflow-y:auto; padding:24px 16px 40px; z-index:40;
+  }
+  .sidenav .group-label{font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:rgba(231,232,225,.45); font-weight:600; padding:0 12px; margin:20px 0 8px;}
+  .sidenav .group-label:first-child{margin-top:0;}
+  .sidenav a{
+    display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:var(--radius-sm);
+    color:rgba(231,232,225,.78); text-decoration:none; font-size:13.5px; font-weight:500;
+    transition:background .15s ease, color .15s ease;
+  }
+  .sidenav a:hover{background:rgba(231,232,225,.06); color:var(--beige);}
+  .sidenav a.active{background:rgba(206,247,159,.1); color:var(--lime);}
+  .sidenav .navdot{flex:0 0 auto; width:18px; height:18px; border-radius:100px; border:1.5px solid rgba(231,232,225,.35);
+    display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:rgba(231,232,225,.6);}
+  .sidenav a.done .navdot{background:var(--lime); border-color:var(--lime); color:var(--charcoal);}
+  .sidenav a.active .navdot{border-color:var(--lime);}
+
+  main{flex:1 1 auto; min-width:0; margin-left:var(--nav-w); padding:0 clamp(20px,4vw,56px) 100px;}
+  .container{max-width:840px; margin:0 auto;}
+
+  /* ---------- intro / hero ---------- */
+  .hero{padding:64px 0 24px;}
+  .hero .overline{font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--charcoal); font-weight:700; margin-bottom:18px;}
+  .hero h1{font-size:clamp(30px,4.2vw,44px); line-height:1.22; margin-bottom:24px;}
+  .hero .lead{font-size:16.5px; color:var(--muted); max-width:640px; margin-bottom:8px;}
+  .hero .accent{color:var(--charcoal); border-bottom:.12em solid var(--lime-deep);}
+
+  .callout{
+    display:flex; gap:16px; padding:20px 22px; border-radius:var(--radius-md);
+    background:var(--card); border:1px solid var(--border); margin:28px 0;
+  }
+  .callout svg{flex:0 0 auto; width:20px; height:20px; margin-top:1px;}
+  .callout p:last-child{margin-bottom:0;}
+  .callout.tip{border-left:3px solid var(--lime-deep);}
+  .callout.warn{border-left:3px solid var(--charcoal);}
+  .callout strong{color:var(--charcoal);}
+
+  /* ---------- how-to-use / glossary cards ---------- */
+  .card-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin:20px 0 8px;}
+  .glossary-card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:18px 20px;}
+  .glossary-card .term{font-family:var(--font-display); font-weight:600; font-size:15px; color:var(--charcoal); margin-bottom:6px; display:flex; align-items:center; gap:8px;}
+  .glossary-card .term .dot{width:8px; height:8px; border-radius:100px; background:var(--lime-deep); flex:0 0 auto;}
+  .glossary-card p{font-size:13.5px; color:var(--muted); margin:0;}
+
+  .setup-box{background:var(--charcoal); color:var(--beige); border-radius:var(--radius-lg); padding:22px 24px; margin:22px 0;}
+  .setup-box h4{color:var(--beige); font-size:14px; margin-bottom:12px;}
+
+  /* ---------- phases ---------- */
+  .phase{padding-top:56px; scroll-margin-top:calc(var(--topbar-h) + 16px); border-top:1px solid var(--border);}
+  .phase:first-of-type{border-top:none;}
+  .phase-head{display:flex; align-items:flex-start; gap:16px; margin-bottom:10px;}
+  .phase-badge{
+    flex:0 0 auto; width:44px; height:44px; border-radius:var(--radius-md); background:var(--charcoal);
+    color:var(--lime); font-family:var(--font-display); font-weight:700; font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .phase-head h2{font-size:clamp(22px,3vw,28px);}
+  .phase-sub{color:var(--muted); font-size:14px; margin-top:2px;}
+  .phase-intro{margin:18px 0 28px; font-size:15px;}
+  .phase-intro p{color:var(--ink);}
+
+  .step{margin:34px 0; scroll-margin-top:calc(var(--topbar-h) + 16px);}
+  .step-head{display:flex; align-items:center; gap:12px; margin-bottom:12px;}
+  .step-check{
+    flex:0 0 auto; width:24px; height:24px; border-radius:6px; border:2px solid rgba(25,25,25,.5);
+    appearance:none; -webkit-appearance:none; cursor:pointer; position:relative; background:var(--card);
+    transition:background .15s ease, border-color .15s ease; box-shadow:0 1px 2px rgba(25,25,25,.06);
+  }
+  .step-check:hover{border-color:var(--charcoal);}
+  .step-check:checked{background:var(--lime-deep); border-color:var(--lime-deep);}
+  .step-check:checked::after{
+    content:""; position:absolute; left:7px; top:3px; width:6px; height:11px;
+    border-right:2.5px solid var(--charcoal); border-bottom:2.5px solid var(--charcoal); transform:rotate(40deg);
+  }
+  .step-num{font-family:var(--font-mono); font-size:12px; color:var(--beige); font-weight:600; background:var(--charcoal); border-radius:100px; padding:4px 12px;}
+  .step-title{font-family:var(--font-display); font-weight:600; font-size:17px; color:var(--charcoal);}
+  .step-body{padding-left:34px;}
+  .step-body p{font-size:14.5px;}
+
+  .fill-in{
+    display:flex; gap:12px; align-items:flex-start; background:#fbffef; border:1.5px solid var(--lime-deep);
+    border-radius:var(--radius-md); padding:12px 16px; margin:12px 0;
+  }
+  .fill-in .tag{
+    flex:0 0 auto; background:var(--charcoal); color:var(--lime); font-size:10.5px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; padding:4px 10px; border-radius:100px; margin-top:1px;
+  }
+  .fill-in p{margin:0; font-size:13.5px; color:var(--ink);}
+  .fill-in code{background:rgba(34,47,48,.08); padding:1px 6px; border-radius:5px; font-size:12.5px;}
+
+  .code-block{position:relative; margin:12px 0 18px;}
+  .code-block pre{
+    margin:0; background:var(--charcoal); color:#dfe6e2; border-radius:var(--radius-md);
+    padding:18px 18px; overflow-x:auto; font-size:12.8px; line-height:1.65;
+  }
+  .code-block code{white-space:pre;}
+  .code-label{
+    position:absolute; top:-10px; left:16px; background:var(--beige); color:var(--muted);
+    font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; font-weight:700;
+    padding:1px 8px; border-radius:100px; border:1px solid var(--border);
+  }
+  .copy-btn{
+    position:absolute; top:10px; right:10px; background:rgba(231,232,225,.1); color:var(--beige);
+    border:1px solid rgba(231,232,225,.18); border-radius:100px; font-family:var(--font-sans);
+    font-size:11.5px; font-weight:600; padding:6px 12px; cursor:pointer; transition:background .15s ease;
+  }
+  .copy-btn:hover{background:rgba(231,232,225,.2);}
+  .copy-btn.copied{background:var(--lime); color:var(--charcoal); border-color:var(--lime);}
+  mark.fillmark{background:var(--lime); color:var(--charcoal); border-radius:4px; padding:0 3px; font-weight:600;}
+
+  .note{
+    font-size:13.5px; color:var(--muted); background:rgba(34,47,48,.05); border-radius:var(--radius-sm);
+    padding:10px 14px; margin:10px 0;
+  }
+  .note strong{color:var(--charcoal);}
+
+  /* ---------- verification / troubleshooting ---------- */
+  .check-list{list-style:none; padding:0; margin:16px 0;}
+  .check-list li{
+    display:flex; gap:12px; align-items:flex-start; background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius-md); padding:14px 16px; margin-bottom:10px; font-size:14px;
+  }
+  .check-list input{margin-top:3px; flex:0 0 auto;}
+  .check-list strong{color:var(--charcoal);}
+
+  table.tbl{width:100%; border-collapse:collapse; margin:16px 0; font-size:13.3px; background:var(--card); border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border);}
+  table.tbl th{background:var(--charcoal); color:var(--beige); text-align:left; padding:10px 14px; font-family:var(--font-display); font-weight:600; font-size:12.5px;}
+  table.tbl td{padding:12px 14px; border-top:1px solid var(--border); vertical-align:top;}
+  table.tbl tr:nth-child(even) td{background:rgba(34,47,48,.03);}
+  table.tbl code{background:rgba(34,47,48,.08); padding:1px 5px; border-radius:4px; font-size:12px;}
+
+  footer{margin-top:60px; padding:28px 0 60px; border-top:1px solid var(--border); color:var(--muted); font-size:12.5px;}
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 900px){
+    .card-grid{grid-template-columns:1fr;}
+    .sidenav{transform:translateX(-100%); transition:transform .25s ease; box-shadow:0 0 0 9999px rgba(0,0,0,0); z-index:60;}
+    .sidenav.open{transform:translateX(0); box-shadow:8px 0 30px rgba(0,0,0,.35);}
+    main{margin-left:0;}
+    .nav-toggle{display:flex;}
+    .topbar .title-block .name{display:none;}
+  }
+  @media (max-width:520px){
+    .topbar{gap:10px;}
+    .progress-wrap{max-width:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <svg class="logo" xmlns="http://www.w3.org/2000/svg" xmlns:v="https://vecta.io/nano" viewBox="0 0 119 31" width="119" height="31" fill="none" preserveAspectRatio="xMidYMid meet"><path d="M50.65 29.755v-3.17l13.174-15.96.919 1.722H50.888v-4.01h17.859v3.17l-13.173 15.96-.998-1.722h14.53v4.01H50.65zm31.787.286c-2.373 0-4.448-.475-6.225-1.424s-3.152-2.251-4.126-3.913c-.974-1.655-1.46-3.541-1.46-5.653s.475-4.028 1.424-5.677c.949-1.643 2.258-2.933 3.925-3.87s3.572-1.406 5.707-1.406 3.937.456 5.568 1.363a9.83 9.83 0 0 1 3.846 3.852c.931 1.655 1.4 3.608 1.4 5.854l-.018.724-.061.761H74.6v-3.328h15.176l-1.959 1.041c.024-1.229-.225-2.312-.761-3.249a5.87 5.87 0 0 0-2.184-2.209c-.919-.535-1.984-.803-3.182-.803s-2.3.268-3.225.803c-.919.536-1.643 1.278-2.16 2.227-.523.949-.779 2.063-.779 3.347v.803c0 1.284.292 2.422.882 3.408.584.992 1.412 1.752 2.483 2.288 1.065.535 2.294.803 3.681.803 1.199 0 2.282-.189 3.243-.56s1.813-.961 2.562-1.765l2.683 3.091c-.961 1.126-2.166 1.984-3.62 2.586s-3.115.901-4.983.901l-.018.006zm13.855-.286V0h5.002v13.314l-.402 5.695.159 5.695v5.05h-4.765.006zm11.853.28c-1.813 0-3.431-.402-4.843-1.205-1.418-.803-2.531-2.014-3.341-3.626-.815-1.619-1.223-3.669-1.223-6.158s.42-4.57 1.26-6.176 1.977-2.799 3.401-3.59c1.43-.791 3.012-1.18 4.746-1.18 2.106 0 3.968.456 5.586 1.363s2.897 2.178 3.846 3.809 1.424 3.554 1.424 5.774-.475 4.144-1.424 5.775-2.227 2.909-3.846 3.827c-1.612.925-3.474 1.381-5.586 1.381v.006zm-.559-4.29c1.198 0 2.275-.268 3.225-.803s1.703-1.308 2.263-2.324.84-2.209.84-3.572-.28-2.586-.84-3.59-1.314-1.771-2.263-2.306-2.021-.803-3.225-.803-2.282.268-3.244.803-1.722 1.302-2.281 2.306-.84 2.197-.84 3.59.28 2.556.84 3.572 1.32 1.789 2.281 2.324 2.045.803 3.244.803z" fill="#E7E8E1"></path><path d="M16.91 0h.03a2.84 2.84 0 0 1 2.495 1.619l3.572 6.194 3.578-6.206.012-.024c.006-.012.006-.024.012-.024.006-.018.012-.024.018-.037s.006-.018.012-.024c.006-.018.012-.024.018-.03.006-.012.006-.018.012-.024.006-.012.012-.024.018-.03 0 0 .006-.012.012-.018.006-.012.006-.018.012-.024.006-.018.012-.024.018-.03.006-.012.006-.018.012-.024.006-.018.012-.024.018-.03.012-.012.012-.018.018-.024.006-.012.012-.024.018-.03 0 0 .006-.012.012-.018.006-.012.006-.018.012-.024.006-.018.018-.024.018-.03.012-.012.012-.018.018-.024.012-.012.024-.024.024-.03.012-.012.012-.018.018-.024l.024-.024c0-.006.012-.012.018-.018.006-.012.012-.018.018-.024.006-.018.018-.024.024-.03.006-.012.012-.018.018-.024.006-.018.018-.024.024-.03.006-.012.012-.018.018-.024l.024-.024.018-.018.024-.024.018-.018.018-.018.024-.024.018-.018c.012-.006.024-.012.03-.024l.018-.018c.012-.006.024-.012.03-.018.006 0 .018-.006.018-.012.012-.006.024-.012.03-.018.006 0 .018-.006.018-.012.018-.006.024-.012.037-.024 0 0 .012-.006.018-.012.024-.012.037-.024.055-.037.024-.012.043-.024.055-.037l.055-.037s.012-.006.018-.012c.012-.006.024-.012.037-.024.006 0 .012-.006.018-.012l.037-.018c.006 0 .012-.006.018-.012.018-.012.037-.018.061-.03.018-.012.037-.018.061-.03.018-.012.043-.018.061-.03s.043-.018.061-.03c.018-.006.043-.018.061-.024a2.46 2.46 0 0 1 .225-.079l.067-.018.067-.018a2.75 2.75 0 0 1 .456-.073h.073.037.037.037.037H16.77h.037L16.91 0z" fill="#717d7a"></path><path d="M33.722 26.846a2.87 2.87 0 0 0-.432-1.193L19.441 1.619A2.85 2.85 0 0 0 16.952 0h-.037-.037-.158c-1.059.061-1.959.7-2.397 1.606L.456 25.647a2.84 2.84 0 0 0-.444 1.272v.03L0 27.199v.024c.006.888.42 1.679 1.065 2.197.408.329.913.554 1.485.608h.024l.237.012h.024 28.057.024c.073 0 .146 0 .219-.012a2.84 2.84 0 0 0 1.546-.627 2.86 2.86 0 0 0 1.047-2.111l-.018-.45.012.006z" fill="#3b4240"></path><path d="M45.995 26.846a2.87 2.87 0 0 0-.432-1.193L31.708 1.619C31.27.7 30.357.055 29.292 0h-.03-.012-.03-.043-.037-.049-.037-.037-.037-.073c-.158.012-.31.037-.456.073-.024 0-.049.012-.067.018l-.067.018-.225.079c-.024.006-.043.018-.061.024s-.043.018-.061.03-.043.018-.061.03-.043.018-.061.03-.037.018-.061.03c-.006 0-.012.006-.018.012 0 0-.024.018-.037.024-.006 0-.012.006-.018.012-.012.006-.024.012-.037.024 0 0-.012.006-.018.012l-.055.037c-.018.012-.037.024-.049.037-.024.012-.037.024-.055.037-.006 0-.018.006-.024.012-.012.006-.018.012-.03.024-.006 0-.018.006-.018.012-.012.006-.024.012-.03.018-.006 0-.018.006-.018.012-.012.006-.024.012-.03.018-.006 0-.018.006-.018.012-.012.012-.024.018-.03.03-.006 0-.012.006-.018.012l-.03.03-.018.012s-.006.018-.012.018l-.024.024h-.006s-.006.018-.012.018l-.024.024-.018.018c-.006.018-.018.024-.024.03-.006.012-.012.018-.018.024-.006.018-.018.024-.024.03-.006.012-.012.018-.018.024-.006.018-.018.024-.024.03l-.024.024c-.006.012-.012.018-.018.024 0 0-.012.012-.012.018l-.012.012c-.006.012-.012.018-.018.024 0 .006-.012.012-.012.018-.006.012-.006.018-.012.024-.006.012-.012.024-.018.03 0 0-.006.012-.012.018-.006.012-.006.018-.012.024-.012.018-.018.024-.024.03-.006.012-.006.018-.012.024-.006.018-.012.024-.018.03-.006.012-.006.018-.012.024v.012l-.018.018s-.006.012-.012.018l-.006.024c-.012.018-.018.024-.024.03-.006.012-.006.018-.012.024-.006.018-.012.024-.018.037s-.006.024-.012.024c-.006.018-.012.024-.018.037L23.11 7.728l10.283 17.841a2.87 2.87 0 0 1 .432 1.193 2.78 2.78 0 0 1 .018.45c-.03.852-.426 1.606-1.047 2.111-.42.347-.943.572-1.533.627l-.231.012h-.012 12.255.024c.073 0 .146 0 .219-.012a2.84 2.84 0 0 0 1.545-.627 2.86 2.86 0 0 0 1.047-2.111l-.018-.45-.097.085z" fill="#d1ff79"></path><path d="M30.929 30.041c.073 0 .146 0 .219-.012a2.84 2.84 0 0 0 1.546-.627 2.86 2.86 0 0 0 1.047-2.111l-.018-.45a2.87 2.87 0 0 0-.432-1.193L23.007 7.807 12.723 25.641a2.84 2.84 0 0 0-.444 1.272v.03l-.012.249v.024c.006.888.42 1.679 1.065 2.197.408.329.913.554 1.485.609h.024l.237.012h.024 15.784.024l.018.006z" fill="#3d473c"></path></svg>
+  <div class="divider"></div>
+  <div class="title-block">
+    <span class="eyebrow">zeb workshop</span>
+    <span class="name">AgentCore Build Guide</span>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <span class="progress-label" id="progressLabel">0 of 27</span>
+  </div>
+  <button class="nav-toggle" id="navToggle" aria-label="Open phase list">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+</div>
+
+<div class="shell">
+  <nav class="sidenav" id="sidenav">
+    <div class="group-label">Orientation</div>
+    <a href="#intro"><span class="navdot"></span>Before you start</a>
+    <a href="#cdk-baseline"><span class="navdot"></span>What the CDK deployed</a>
+    <a href="#concepts"><span class="navdot"></span>Key concepts</a>
+
+    <div class="group-label">Build</div>
+    <a href="#phase-0" data-phase="0"><span class="navdot">0</span>Bootstrap the project</a>
+    <a href="#phase-1" data-phase="1"><span class="navdot">1</span>Investor harness</a>
+    <a href="#phase-2" data-phase="2"><span class="navdot">2</span>Broker harness</a>
+    <a href="#phase-3" data-phase="3"><span class="navdot">3</span>Legacy portal OAuth</a>
+    <a href="#phase-4" data-phase="4"><span class="navdot">4</span>Backend wiring</a>
+
+    <div class="group-label">Wrap up</div>
+    <a href="#verify"><span class="navdot"></span>Verification checklist</a>
+    <a href="#limitations"><span class="navdot"></span>Known limitations</a>
+    <a href="#troubleshooting"><span class="navdot"></span>Troubleshooting</a>
+  </nav>
+
+  <main>
+    <div class="container">
+
+      <section id="intro" class="hero">
+        <div class="overline">Amazon Bedrock AgentCore</div>
+        <h1>You are about to build two <span class="accent">live AI agents</span>, by hand, from an empty folder.</h1>
+        <p class="lead">This guide assumes you can write code and use the AWS CLI, but have never touched AgentCore before. Every step explains what you are doing and why, before it asks you to run anything. Work through the phases in order. Later phases assume the earlier ones deployed successfully.</p>
+
+        <div class="callout tip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#9FD16A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16" r=".5" fill="#9FD16A"/></svg>
+          <p><strong>How this page works.</strong> Tick the checkbox next to a step once you have run it and it worked. The bar at the top of the page fills in as you go, so you always know how far through the build you are. A lime box marked <strong>FILL IN</strong> means a command has a placeholder you must replace with a real value before running it. Nothing on this page is sent anywhere. Your progress is saved only in this browser.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="clone"><span class="step-num">Start</span><span class="step-title">Clone the workshop repo</span></div>
+          <div class="step-body">
+            <p>Everything in this guide runs from inside the workshop repo, on the <code>workshop</code> branch. If you have not already got a copy on your machine, clone it and move into it now.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>git clone --branch workshop https://github.com/zeb-global/crexi-agentcore-workshop.git
+cd crexi-agentcore-workshop</code></pre>
+            </div>
+            <div class="note">Every command in the rest of this guide assumes your terminal's current directory is the repo root you just <code>cd</code>'d into. If you already cloned it earlier, just <code>cd</code> back into that same folder instead of cloning again.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="prereq"><span class="step-num">Prereqs</span><span class="step-title">Check your tooling and AWS access</span></div>
+          <div class="step-body">
+            <p>Confirm each of these before you go any further. Missing one of these is the most common reason a command fails later for a reason that has nothing to do with AgentCore.</p>
+            <table class="tbl" style="margin:12px 0;">
+              <thead><tr><th style="width:30%;">Needed</th><th>How to check</th></tr></thead>
+              <tbody>
+                <tr><td>Node.js 20 or newer</td><td><code>node --version</code></td></tr>
+                <tr><td>Python 3.12 or newer</td><td><code>python3 --version</code></td></tr>
+                <tr><td>AWS CLI v2</td><td><code>aws --version</code> should print <code>aws-cli/2.x</code></td></tr>
+                <tr><td>AgentCore CLI</td><td><code>npm install -g @aws/agentcore</code>, then <code>agentcore --version</code></td></tr>
+                <tr><td>AWS credentials, with Bedrock model access</td><td><code>aws sts get-caller-identity</code> should print an account ID and ARN, not an error</td></tr>
+                <tr><td>CDK bootstrapped in your account and region</td><td><code>cdk bootstrap</code>, once, if you have never used CDK in this account before</td></tr>
+              </tbody>
+            </table>
+            <p>If you were handed temporary AWS credentials (an access key, secret key, and session token, the common case for a shared workshop account), export all three in this same terminal. They expire, sometimes within an hour, and every command in this guide is safe to re-run once you refresh them.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>export AWS_ACCESS_KEY_ID=<mark class="fillmark">AKIA...</mark>
+export AWS_SECRET_ACCESS_KEY=<mark class="fillmark">...</mark>
+export AWS_SESSION_TOKEN=<mark class="fillmark">...</mark>
+aws sts get-caller-identity</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="bootstrap"><span class="step-num">Bootstrap</span><span class="step-title">Pick your workshop ID and deploy the baseline infrastructure</span></div>
+          <div class="step-body">
+            <p>This AWS account is shared with every other participant. Two values keep your resources from colliding with theirs: a <strong>WORKSHOP_ID</strong> (a short, lowercase, letters-and-digits name, unique to you, must start with a letter, for example your initials plus a number) and a <strong>WORKSHOP_SECRET</strong> (any string you pick, used only to derive your two test users' passwords later, so nobody has to hand you a password). Nothing in this guide will work until both are exported in this terminal.</p>
+            <div class="fill-in">
+              <span class="tag">Fill in</span>
+              <p>Replace <code>&lt;your workshop id&gt;</code> and <code>&lt;your workshop secret&gt;</code> with values you pick yourself, and remember them exactly. You will re-export <code>WORKSHOP_ID</code> in every new terminal you open for the rest of this guide, and re-type the secret later when you compute your login password.</p>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>export WORKSHOP_ID=<mark class="fillmark">&lt;your workshop id&gt;</mark>
+export WORKSHOP_SECRET=<mark class="fillmark">&lt;your workshop secret&gt;</mark>
+export AWS_REGION=us-west-2   # or your region
+
+make preflight
+make bootstrap WORKSHOP_ID=$WORKSHOP_ID WORKSHOP_SECRET=$WORKSHOP_SECRET</code></pre>
+            </div>
+            <p><code>make preflight</code> checks everything in the table above at once, plus that your <code>WORKSHOP_ID</code> is valid. <code>make bootstrap</code> then installs the project's own dependencies and deploys five baseline CDK stacks (Data, Identity, Legacy, Tools, Observability), and deliberately stops there. There is no <code>agentcore/</code> or <code>app/</code> folder in this repo yet. Everything from Phase 0 onward is you building those by hand, which is the actual point of this workshop.</p>
+            <div class="note">This step can take several minutes the first time, since it is also creating a Python virtual environment, a Node virtual environment, and installing the frontend's packages. That is normal.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="confirm-baseline"><span class="step-num">Confirm</span><span class="step-title">Confirm the baseline actually deployed</span></div>
+          <div class="step-body">
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Tools" \
+  --query "Stacks[0].Outputs" --output table</code></pre>
+            </div>
+            <div class="note">You should see <strong>MarketDataFunctionArn</strong> and <strong>ListingOpsFunctionArn</strong>, two Lambda functions you are about to wire up as Gateway targets. Keep this command handy, you will pull these ARNs again shortly.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="cdk-baseline" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge">5</div>
+          <div>
+            <h2>What the CDK deployed</h2>
+            <div class="phase-sub">Five stacks, plain AWS infrastructure, nothing AgentCore-native yet.</div>
+          </div>
+        </div>
+        <div class="phase-intro">
+          <p><code>make bootstrap</code> deployed five CDK stacks named <code>Crexi${WORKSHOP_ID}&lt;Name&gt;</code>. None of this is AgentCore-native, it is the plain AWS infrastructure the harnesses you build in the phases below will call into. Worth knowing what each resource is for before you start wiring Gateways to it.</p>
+        </div>
+
+        <h3 style="font-size:16px; margin:20px 0 10px;">Data <span style="color:var(--muted); font-weight:400; font-size:13px;">&mdash; the listings themselves, and everything that reads or writes them</span></h3>
+        <table class="tbl">
+          <thead><tr><th style="width:26%;">Resource</th><th style="width:42%;">Purpose</th><th>Used by</th></tr></thead>
+          <tbody>
+            <tr><td>DynamoDB <code>crexi-&lt;id&gt;-listings</code></td><td>The listings: market, asset type, units, asking price, value-add flag. Has a GSI on market+assetType sorted by price.</td><td><code>mcp-market-data</code> (search/get), <code>mcp-listing-ops</code> (price writes)</td></tr>
+            <tr><td>DynamoDB <code>crexi-&lt;id&gt;-changelog</code></td><td>Append-only history of price/field changes per listing.</td><td><code>mcp-listing-ops</code> (writes), the <code>get_change_log</code> tool</td></tr>
+            <tr><td>DynamoDB <code>crexi-&lt;id&gt;-approvals</code></td><td>Short-lived (TTL) approval tokens minted after a broker confirms a price change, so a write cannot happen without one.</td><td>Backend (mints), <code>mcp-listing-ops</code> (validates)</td></tr>
+            <tr><td>S3 <code>crexi-&lt;id&gt;-docs-&lt;account&gt;-&lt;region&gt;</code></td><td>T-12 operating statements, offering memoranda, comps JSON, the PDFs <code>get_document_text</code> extracts from.</td><td><code>mcp-market-data</code></td></tr>
+            <tr><td>Lambda <code>crexi-&lt;id&gt;-seed-data</code> (custom resource)</td><td>Loads the Columbus listings/comps and generates the T-12/OM PDFs on first deploy, so the account starts in "opening state."</td><td>Runs once at <code>cdk deploy</code>; <code>make seed</code> re-runs it</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="font-size:16px; margin:26px 0 10px;">Identity <span style="color:var(--muted); font-weight:400; font-size:13px;">&mdash; who dana and marcus actually are, at the AWS level</span></h3>
+        <table class="tbl">
+          <thead><tr><th style="width:26%;">Resource</th><th style="width:42%;">Purpose</th><th>Used by</th></tr></thead>
+          <tbody>
+            <tr><td>Cognito User Pool <code>crexi-&lt;id&gt;-users</code></td><td>The inbound identity for both harnesses, who dana/marcus actually sign in as.</td><td>Backend JWT auth, both harnesses' <code>customJwtAuthorizer</code></td></tr>
+            <tr><td>App client <code>crexi-&lt;id&gt;-app</code></td><td>The main app's client (no secret, user/SRP auth) the frontend/backend use to sign users in.</td><td>Frontend login, backend token verification</td></tr>
+            <tr><td><code>investors</code> / <code>brokers</code> Cognito groups</td><td>Separates dana from marcus at the identity layer, not just by username.</td><td>Backend routes broker-only actions by group membership</td></tr>
+            <tr><td>Second app client + Hosted UI domain <code>crexi-&lt;id&gt;-legacy-oauth</code></td><td>Stands in for "the legacy deal desk's own OAuth provider," same pool, same identities, but a separate client with the <code>authorization_code</code> grant and a real secret.</td><td>Phase 3's workload identity + OAuth2 credential provider</td></tr>
+            <tr><td>Lambda <code>crexi-&lt;id&gt;-seed-users</code> (custom resource)</td><td>Creates dana/marcus, sets their password (derived from <code>WORKSHOP_SECRET</code>), adds them to their groups.</td><td>Runs once at <code>cdk deploy</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="font-size:16px; margin:26px 0 10px;">Legacy <span style="color:var(--muted); font-weight:400; font-size:13px;">&mdash; the no-API system the Browser tool has to actually navigate</span></h3>
+        <table class="tbl">
+          <thead><tr><th style="width:26%;">Resource</th><th style="width:42%;">Purpose</th><th>Used by</th></tr></thead>
+          <tbody>
+            <tr><td>Lambda <code>crexi-&lt;id&gt;-legacy-deal-desk</code> + Function URL</td><td>The legacy app itself, a login-gated form with no API. Verifies OAuth tokens issued by the Legacy OAuth app client; never participates in the OAuth dance itself.</td><td>Broker harness's Browser tool (Phase 2), Phase 3's OAuth flow</td></tr>
+            <tr><td>DynamoDB <code>crexi-&lt;id&gt;-legacy-creds</code></td><td>The legacy app's own login credentials, deliberately separate from Cognito.</td><td><code>legacy-deal-desk</code> Lambda only</td></tr>
+            <tr><td>DynamoDB <code>crexi-&lt;id&gt;-legacy-records</code></td><td>Rent roll, concessions, deferred maintenance, data that exists nowhere else, which is the point of the Browser-tool exercise.</td><td><code>legacy-deal-desk</code> Lambda only</td></tr>
+            <tr><td>Lambda <code>crexi-&lt;id&gt;-seed-legacy</code> (custom resource)</td><td>Seeds the legacy credentials + records tables at deploy time.</td><td>Runs once at <code>cdk deploy</code>; <code>make seed</code> re-runs it</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="font-size:16px; margin:26px 0 10px;">Tools <span style="color:var(--muted); font-weight:400; font-size:13px;">&mdash; the two Lambdas that become MCP tools once you wire them to a Gateway</span></h3>
+        <table class="tbl">
+          <thead><tr><th style="width:26%;">Resource</th><th style="width:42%;">Purpose</th><th>Used by</th></tr></thead>
+          <tbody>
+            <tr><td>Lambda <code>crexi-&lt;id&gt;-mcp-market-data</code></td><td>Read-only tools: <code>search_listings</code>, <code>get_listing</code>, <code>get_market_comps</code>, <code>list_property_documents</code>, <code>get_document_text</code>.</td><td>Investor harness, via <code>gw-readonly</code> (Phase 1)</td></tr>
+            <tr><td>Lambda <code>crexi-&lt;id&gt;-mcp-listing-ops</code></td><td>Write tool: <code>update_listing_price</code> (approval-token gated), plus <code>get_change_log</code>.</td><td>Broker harness, via <code>gw-ops</code> (Phase 2)</td></tr>
+          </tbody>
+        </table>
+        <div class="note">These two exist as plain Lambda functions here. The Gateway/target wiring that turns them into MCP tools happens later, by hand, in <code>agentcore/agentcore.json</code> (Phases 1 and 2), not in this stack.</div>
+
+        <h3 style="font-size:16px; margin:26px 0 10px;">Observability <span style="color:var(--muted); font-weight:400; font-size:13px;">&mdash; one account-wide setting, not per-participant</span></h3>
+        <table class="tbl">
+          <thead><tr><th style="width:26%;">Resource</th><th style="width:42%;">Purpose</th><th>Used by</th></tr></thead>
+          <tbody>
+            <tr><td>CloudWatch Transaction Search (account-level)</td><td>Makes AgentCore traces (model calls, memory ops, Gateway/tool calls, Browser and Code Interpreter sessions) queryable in the GenAI Observability dashboard, with zero instrumentation code.</td><td>Every harness invocation, from your first deploy on</td></tr>
+          </tbody>
+        </table>
+        <div class="note">One-time and idempotent. Only the first participant in a shared account actually creates it, this stack checks first and skips itself if it is already active.</div>
+      </section>
+
+      <section id="concepts">
+        <h2 style="font-size:20px; margin-bottom:6px;">Key concepts, before you touch the CLI</h2>
+        <p style="color:var(--muted); font-size:14px; margin-bottom:18px;">AgentCore has its own vocabulary. Here is what each piece means in plain terms, before you meet it in a command.</p>
+        <div class="card-grid">
+          <div class="glossary-card">
+            <div class="term"><span class="dot"></span>Harness</div>
+            <p>The agent itself. One JSON file that says which model to use, which tools it can call, and how it should remember things. AgentCore runs the actual conversation loop for you, you never write that loop yourself.</p>
+          </div>
+          <div class="glossary-card">
+            <div class="term"><span class="dot"></span>Gateway</div>
+            <p>Turns an existing Lambda function into a set of tools a harness can call over the network. It is locked down with IAM, so only your own harnesses can invoke it, not the open internet.</p>
+          </div>
+          <div class="glossary-card">
+            <div class="term"><span class="dot"></span>Tool schema</div>
+            <p>A JSON file listing each tool's name, description, and expected input. The Gateway reads it to know what to expose, and the model reads it to know how to call each tool correctly.</p>
+          </div>
+          <div class="glossary-card">
+            <div class="term"><span class="dot"></span>Managed memory</div>
+            <p>A built-in feature that remembers facts about a returning user, such as their stored search criteria, across separate conversations. You do not build or manage this database yourself.</p>
+          </div>
+          <div class="glossary-card">
+            <div class="term"><span class="dot"></span>Workload identity and OAuth</div>
+            <p>The way a harness acts on a specific person's behalf inside an outside system, such as a legacy portal, without ever holding that person's password.</p>
+          </div>
+          <div class="glossary-card">
+            <div class="term"><span class="dot"></span>Inline function tool</div>
+            <p>A tool your own backend code answers, not a Lambda behind a Gateway. It is how you pause the agent and hand control to a human, for example to approve a price change before it is committed.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== PHASE 0 ===================== -->
+      <section id="phase-0" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge">0</div>
+          <div>
+            <h2>Bootstrap the AgentCore project</h2>
+            <div class="phase-sub">Create the config file that every other command in this guide reads and writes.</div>
+          </div>
+        </div>
+        <div class="phase-intro">
+          <p><code>agentcore/agentcore.json</code> does not exist yet. This is the file every <code>agentcore add</code> and <code>agentcore deploy</code> command reads from and writes to for the rest of the guide, so it has to exist before anything else can happen. The tool that creates it, <code>agentcore create</code>, always creates a brand new project folder rather than initializing in the folder you are already in. So the plan is: run it once at the repo root, then move only the pieces you need up into place, and discard the rest.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p0-1"><span class="step-num">0.1</span><span class="step-title">Create and relocate the project</span></div>
+          <div class="step-body">
+            <p><code>--no-agent</code> matters here. Without it, this command also scaffolds an unrelated runtime-agent code skeleton you do not want. What it does create is a config folder plus a generated CDK project, which is AgentCore's own deployment mechanism, not something you hand write. The commands below move that into place as <code>./agentcore</code> and throw away the now-empty wrapper folder.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore create --project-name crexiWorkshopV2 --no-agent --skip-git --skip-install
+mv crexiWorkshopV2/agentcore .
+rm -rf crexiWorkshopV2</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p0-2"><span class="step-num">0.2</span><span class="step-title">Register your workshop ID as a deployment target</span></div>
+          <div class="step-body">
+            <p>Now that <code>agentcore/aws-targets.json</code> exists, tell it which AWS account and region you are deploying to. This is idempotent, so it is safe to run again if you are ever unsure whether it already ran.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>WORKSHOP_ID=$WORKSHOP_ID scripts/ensure-aws-target.sh</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p0-3"><span class="step-num">0.3</span><span class="step-title">Install the generated CDK project's own dependencies</span></div>
+          <div class="step-body">
+            <p>You skipped this above with <code>--skip-install</code>, so it needs to happen once now.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>cd agentcore/cdk &amp;&amp; npm install &amp;&amp; cd ../..</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p0-4"><span class="step-num">0.4</span><span class="step-title">Confirm you now have a real, empty project</span></div>
+          <div class="step-body">
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>cat agentcore/agentcore.json</code></pre>
+            </div>
+            <div class="note">You should see <code>"agentCoreGateways": []</code> and <code>"harnesses": []</code>, an empty project with your project name. Everything from here is a series of <code>agentcore add ...</code> commands building this same file up, piece by piece.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== PHASE 1 ===================== -->
+      <section id="phase-1" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge">1</div>
+          <div>
+            <h2>Investor harness</h2>
+            <div class="phase-sub">One read-only Gateway, one tool schema, one harness with Code Interpreter for the underwriting math.</div>
+          </div>
+        </div>
+        <div class="phase-intro">
+          <p>The investor agent needs to search listings, pull documents, and run underwriting numbers. It never writes anything, so everything in this phase is read-only.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p1-1"><span class="step-num">1.1</span><span class="step-title">Write the market-data tool schema</span></div>
+          <div class="step-body">
+            <p>A Gateway target needs a schema file describing the Lambda's tools: their names, descriptions, and input shapes. This is describing the <strong>already-built</strong> <code>mcp-market-data</code> Lambda's contract (see <code>services/mcp_market_data/handler.py</code> if you want to see where these tool names come from), not something you are inventing.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>mkdir -p agentcore/tool-schemas
+cat &gt; agentcore/tool-schemas/market-data.json &lt;&lt;'EOF'
+[
+  {
+    "name": "search_listings",
+    "description": "Search Columbus multi-family listings by market, asset type, unit range, price ceiling, and value-add flag.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "market": {"type": "string", "description": "e.g. columbus-oh"},
+        "assetType": {"type": "string", "description": "e.g. multifamily"},
+        "unitsMin": {"type": "integer"},
+        "unitsMax": {"type": "integer"},
+        "priceMax": {"type": "number"},
+        "valueAdd": {"type": "boolean"}
+      }
+    }
+  },
+  {
+    "name": "get_listing",
+    "description": "Get a single listing by its listingId.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {"listingId": {"type": "string"}},
+      "required": ["listingId"]
+    }
+  },
+  {
+    "name": "get_market_comps",
+    "description": "Recent Columbus multi-family comparable sales and their cap rates.",
+    "inputSchema": {"type": "object", "properties": {}}
+  },
+  {
+    "name": "list_property_documents",
+    "description": "List the PDF documents available for a listing (e.g. T-12 operating statement, offering memorandum).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {"listingId": {"type": "string"}},
+      "required": ["listingId"]
+    }
+  },
+  {
+    "name": "get_document_text",
+    "description": "Extract text from a listing's PDF document. Net operating income (NOI) exists ONLY here, inside the T-12 operating statement -- it is not in any structured field.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "listingId": {"type": "string"},
+        "documentName": {"type": "string", "description": "e.g. T12_2025.pdf or OM.pdf"}
+      },
+      "required": ["listingId", "documentName"]
+    }
+  }
+]
+EOF</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p1-2"><span class="step-num">1.2</span><span class="step-title">Create the read-only Gateway</span></div>
+          <div class="step-body">
+            <p>This creates an empty Gateway, authorized with <code>AWS_IAM</code>, so only your own harnesses can invoke it, not the public internet.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore add gateway --name gw-readonly-${WORKSHOP_ID} --protocol-type MCP \
+  --authorizer-type AWS_IAM --exception-level NONE</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p1-3"><span class="step-num">1.3</span><span class="step-title">Attach the market-data Lambda as a target</span></div>
+          <div class="step-body">
+            <p>Point the empty Gateway at the real Lambda, using the schema you just wrote so AgentCore knows what tools to expose. First look up the Lambda's ARN from the Tools stack you confirmed earlier, then attach it.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>MARKET_DATA_ARN=$(aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Tools" \
+  --query "Stacks[0].Outputs[?OutputKey=='MarketDataFunctionArn'].OutputValue" --output text)
+
+agentcore add gateway-target --gateway gw-readonly-${WORKSHOP_ID} --name market-data \
+  --type lambda-function-arn --lambda-arn "$MARKET_DATA_ARN" \
+  --tool-schema-file agentcore/tool-schemas/market-data.json</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p1-4"><span class="step-num">1.4</span><span class="step-title">Deploy the Gateway alone, before building the harness</span></div>
+          <div class="step-body">
+            <p>A harness references its Gateway by a fully resolved ARN, not a live CDK reference. AWS only assigns that ARN once the Gateway actually exists, so you deploy now, before creating the harness that needs it.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore deploy --yes --target $WORKSHOP_ID</code></pre>
+            </div>
+            <p>Then grab the ARN it just created:</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore status --target $WORKSHOP_ID --type gateway --json | python3 -c "
+import json, sys
+for r in json.load(sys.stdin)['resources']:
+    print(r['name'], '-&gt;', r['identifier'])
+"</code></pre>
+            </div>
+            <div class="note">Copy the full ARN printed for <code>gw-readonly-${WORKSHOP_ID}</code>. You need it in the next step. It looks like <code>arn:aws:bedrock-agentcore:us-west-2:&lt;account&gt;:gateway/gw-readonly-kvj07-vzgzhckqbe</code>, not just the bare name.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p1-5"><span class="step-num">1.5</span><span class="step-title">Create the investor harness</span></div>
+          <div class="step-body">
+            <p>Passing the bare Gateway name here will pass validation but fail later, at deploy time, with a confusing <code>does not match pattern ^arn:aws...</code> error. Use the full ARN from step 1.4.</p>
+            <div class="fill-in">
+              <span class="tag">Fill in</span>
+              <p>Replace <code>&lt;gw-readonly ARN from 1.4&gt;</code> with the exact ARN you copied at the end of step 1.4.</p>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore add harness --name investorAgent_${WORKSHOP_ID} \
+  --model-provider bedrock --model-id us.anthropic.claude-sonnet-4-6 \
+  --tools agentcore_gateway,agentcore_code_interpreter \
+  --gateway-arn "<mark class="fillmark">&lt;gw-readonly ARN from 1.4&gt;</mark>" --gateway-outbound-auth awsIam \
+  --memory-mode managed --memory-strategies SEMANTIC,SUMMARIZATION,USER_PREFERENCE \
+  --memory-event-expiry-days 30 \
+  --allowed-tools "@market-data/*,@code-interpreter"</code></pre>
+            </div>
+            <p>This creates <code>app/investorAgent_${WORKSHOP_ID}/harness.json</code>. Before moving on, check one thing: <code>--allowed-tools</code> references tools by the harness tool's own <code>name</code> field, not by the Gateway target's name. <code>agentcore add harness</code> defaults the gateway tool's name to the generic <code>"gateway"</code>, which <code>@market-data/*</code> will not match. If left alone, the model never sees the real tools and quietly fabricates data with the code interpreter instead. Rename it so it lines up with <code>allowedTools</code>:</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>python3 -c "
+import json
+p = 'app/investorAgent_${WORKSHOP_ID}/harness.json'
+d = json.load(open(p))
+for t in d['tools']:
+    if t['type'] == 'agentcore_gateway':
+        t['name'] = 'market-data'
+json.dump(d, open(p, 'w'), indent=2)
+"</code></pre>
+            </div>
+            <p>Now replace the placeholder system prompt with the real one, which encodes the grounding rules (never invent a price or a property) and the underwriting workflow (always run numbers through Code Interpreter, never in the model's head):</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>cat &gt; app/investorAgent_${WORKSHOP_ID}/system-prompt.md &lt;&lt;'EOF'
+You are CREXi's investor-facing assistant for commercial real estate. You help
+investors find and evaluate multi-family listings.
+
+Grounding rules:
+- Never state a property name, address, unit count, price, or any figure
+  that did not come from a tool call this turn or from memory context
+  clearly labeled as this user's prior stored criteria. If you are not sure
+  a property exists, call search_listings or get_listing to check.
+- Units and asking price come from search_listings / get_listing. Market
+  cap rates and comparable sales come from get_market_comps. Net operating
+  income (NOI) exists ONLY inside a listing's T-12 operating statement PDF
+  -- retrieve it with get_document_text(listingId, "T12_2025.pdf"). It is
+  not a field on the listing itself, and you must never estimate or recall
+  it from memory.
+- When a returning user has stored criteria (market, unit range, asking
+  price ceiling, minimum cap rate, value-add preference), apply them without
+  asking the user to repeat them.
+- Be proactive: once the user's intent is clear (e.g. "what's new in
+  Columbus"), immediately call search_listings with their stored or stated
+  criteria, then pull documents and run the underwriting -- do not stop to
+  ask permission to search. Never invent a result instead of calling a tool.
+- Never state internal system data: listing IDs (e.g. "westerville-park"),
+  database version numbers, raw tool-call statuses, timestamps, session
+  IDs, or any other internal identifier. Refer to a property only by its
+  name. If a listing's price or details recently changed, say so in plain
+  language ("the asking price was recently updated") -- never cite a
+  version number or record ID as evidence.
+- Never narrate your own tool-calling mechanics, retries, or backend
+  requirements to the user ("the backend requires...", "let me initialize
+  a fresh session", "you're right, I apologize, running X now"). If a
+  tool call is rejected and you need to retry, just retry silently and
+  give the user only the final, correct answer -- never explain what went
+  wrong internally or how you fixed it.
+
+Underwriting:
+- code-interpreter is a tool you ALREADY have, on every turn -- never
+  search for it, and never conclude it is unavailable because a tool
+  search didn't return it. The x_amz_bedrock_agentcore_search facility
+  only helps you discover market-data's own sub-tools (its Gateway has
+  many, so they're not all listed up front); code-interpreter is not
+  behind it, is not part of that search, and requires no discovery step
+  at all -- just call it directly, the same way you call any other tool
+  in your list.
+- You must NOT calculate cap rate, price per unit, DSCR, or cash-on-cash
+  yourself, and you must not decide which properties qualify. Whenever the
+  user wants an evaluation, comparison, or recommendation, assemble
+  (name, listingId, units, askingPrice, noi) for each candidate property and
+  run the underwriting using the code-interpreter TOOL -- an actual tool
+  call to code-interpreter that EXECUTES Python and returns real stdout.
+  Do NOT use file_operations for this, and do not type the numbers
+  yourself under any circumstance -- writing or viewing a script without
+  running it is not underwriting.
+- The underwriting computes, per property: cap_rate = noi / askingPrice * 100
+  (2 decimals), price_per_unit = askingPrice / units (rounded), and DSCR +
+  cash-on-cash assuming LTV 0.65, rate 6.5%, 30-year amortization. A property
+  meets_criteria when cap_rate &gt;= the investor's minimum (default 6.5 if none
+  is on record).
+- The LAST line the executed code prints must be exactly one line of
+  compact JSON, no markdown or code fence, of this shape:
+  {"type":"underwriting_comparison","criteria":{"cap_rate_min":<mark class="fillmark">&lt;n&gt;</mark>},
+   "properties":[{"name":..,"listingId":..,"units":..,"askingPrice":..,
+   "noi":..,"cap_rate":..,"price_per_unit":..,"dscr":..,"cash_on_cash":..,
+   "meets_criteria":true|false}],"recommended":{"name":..,"listingId":..}}
+- That is the ONLY step required to render the comparison card -- the
+  interface reads the JSON directly out of code-interpreter's own stdout
+  the moment its result comes back. There is no separate submission call;
+  do not invent one.
+- After code-interpreter returns that JSON, give a brief 1-3 sentence
+  spoken summary (what qualifies, why, the recommendation). Do not
+  re-type the table or the JSON itself -- the interface already rendered
+  it from code-interpreter's own result.
+
+Style:
+- Never paste a raw file/download URL into your reply -- say the
+  spreadsheet or output is ready to download.
+- Be concise and specific to the user's stated or stored market and
+  criteria. Plain, professional text. No emojis or decorative symbols.
+EOF</code></pre>
+            </div>
+            <div class="note">The <code>&lt;n&gt;</code> inside that JSON shape is not a placeholder for you to fill in. It is part of the prompt text itself, telling the model to substitute the real minimum cap rate there when it writes its own output. Leave it exactly as shown.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p1-6"><span class="step-num">1.6</span><span class="step-title">Deploy and verify</span></div>
+          <div class="step-body">
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore validate
+agentcore deploy --yes --target $WORKSHOP_ID
+agentcore invoke --target $WORKSHOP_ID --harness investorAgent_${WORKSHOP_ID} \
+  --user-id dana "What multi-family listings are available in Columbus?"</code></pre>
+            </div>
+            <div class="note">You should get back real listings, with a <code>search_listings</code> tool call visible in the trace, not a hallucinated answer. Copy the <code>Session:</code> ID that <code>agentcore invoke</code> prints at the end, you need it in the next step.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p1-7"><span class="step-num">1.7</span><span class="step-title">Run a live evaluation against that session</span></div>
+          <div class="step-body">
+            <p>AgentCore Evaluations can score a real session on demand, without deploying anything, which makes it the fastest way to see the service actually work. First get the investor harness's real Runtime ARN, evaluators run against a Runtime ARN, not the harness name.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore status --target $WORKSHOP_ID --type harness --json
+# copy investorAgent_${WORKSHOP_ID}'s "agentRuntimeArn"</code></pre>
+            </div>
+            <div class="fill-in">
+              <span class="tag">Fill in</span>
+              <p>Replace both placeholders below: <code>&lt;agentRuntimeArn&gt;</code> with the value you just copied, and <code>&lt;session ID&gt;</code> with the one 1.6's <code>agentcore invoke</code> printed.</p>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore run eval --runtime-arn "&lt;agentRuntimeArn&gt;" --region $AWS_REGION \
+  --evaluator Builtin.Helpfulness --session-id "&lt;session ID&gt;"</code></pre>
+            </div>
+            <div class="note">This prints a score (e.g. <code>Builtin.Helpfulness: 1.00</code>) and writes a JSON results file, no <code>agentcore add evaluator</code>, no deploy step. That's deliberate: <code>Builtin.*</code> evaluators need none of that.</div>
+            <div class="note">Don't reach for <code>agentcore add evaluator</code> here to try a custom evaluator instead. It registers in <code>agentcore.json</code> and <code>agentcore status</code> will even show it, but this project's generated CDK stack only wires <code>harnesses</code> and <code>agentCoreGateways</code> into the actual deploy, so a custom evaluator never reaches AWS. Stick to <code>Builtin.*</code> evaluators for now, see Troubleshooting if you want to understand why.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== PHASE 2 ===================== -->
+      <section id="phase-2" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge">2</div>
+          <div>
+            <h2>Broker harness</h2>
+            <div class="phase-sub">A second Gateway for write operations, the Browser tool, and two hand-written inline function tools.</div>
+          </div>
+        </div>
+        <div class="phase-intro">
+          <p>Same idea as Phase 1, but this harness needs more. It needs a Gateway that can write (change a listing's price), the Browser tool for a legacy system with no API, and two <code>inline_function</code> tools that the CLI has no flags for. You will splice those directly into <code>harness.json</code> by hand, that is expected here, not a workaround.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p2-1"><span class="step-num">2.1</span><span class="step-title">Write the listing-ops tool schema</span></div>
+          <div class="step-body">
+            <p>This describes the already-built <code>mcp-listing-ops</code> Lambda's contract (see <code>services/mcp_listing_ops/handler.py</code> for where these tool names come from).</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>cat &gt; agentcore/tool-schemas/listing-ops.json &lt;&lt;'EOF'
+[
+  {
+    "name": "get_change_log",
+    "description": "Recent price/field changes recorded for a listing, with who made each change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "listingId": {"type": "string"},
+        "limit": {"type": "integer"}
+      },
+      "required": ["listingId"]
+    }
+  },
+  {
+    "name": "update_listing_price",
+    "description": "Commit a confirmed price change for a listing. Requires an approvalToken minted by the confirmation step -- this tool will reject the call without one.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "listingId": {"type": "string"},
+        "newPrice": {"type": "number"},
+        "approvalToken": {"type": "string", "description": "Token returned by the confirm_listing_change confirmation step"}
+      },
+      "required": ["listingId", "newPrice", "approvalToken"]
+    }
+  }
+]
+EOF</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p2-2"><span class="step-num">2.2</span><span class="step-title">Gateway plus target</span></div>
+          <div class="step-body">
+            <p>Same pattern as 1.2 and 1.3, but for the write-capable <code>listing-ops</code> Lambda, rolled into one block: create the Gateway, deploy it so it exists, look up the Lambda's ARN, attach it as a target, then deploy again so the target exists too.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore add gateway --name gw-ops-${WORKSHOP_ID} --protocol-type MCP \
+  --authorizer-type AWS_IAM --exception-level NONE
+
+agentcore deploy --yes --target $WORKSHOP_ID
+
+LISTING_OPS_ARN=$(aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Tools" \
+  --query "Stacks[0].Outputs[?OutputKey=='ListingOpsFunctionArn'].OutputValue" --output text)
+
+agentcore add gateway-target --gateway gw-ops-${WORKSHOP_ID} --name listing-ops \
+  --type lambda-function-arn --lambda-arn "$LISTING_OPS_ARN" \
+  --tool-schema-file agentcore/tool-schemas/listing-ops.json
+
+agentcore deploy --yes --target $WORKSHOP_ID</code></pre>
+            </div>
+            <div class="note">Fetch both Gateway ARNs now, the readonly one from Phase 1 and the ops one from just now, the same way as step 1.4 (<code>agentcore status --type gateway --json</code>). You need both in the next step.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p2-3"><span class="step-num">2.3</span><span class="step-title">The harness itself, plus three hand-added tools</span></div>
+          <div class="step-body">
+            <div class="fill-in">
+              <span class="tag">Fill in</span>
+              <p>Replace <code>&lt;gw-ops ARN from 2.2&gt;</code> with the <code>gw-ops-${WORKSHOP_ID}</code> ARN you fetched at the end of step 2.2.</p>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore add harness --name brokerAgent_${WORKSHOP_ID} \
+  --model-provider bedrock --model-id us.anthropic.claude-sonnet-4-6 \
+  --tools agentcore_gateway,agentcore_browser \
+  --gateway-arn "<mark class="fillmark">&lt;gw-ops ARN from 2.2&gt;</mark>" --gateway-outbound-auth awsIam \
+  --memory-mode managed --memory-strategies SEMANTIC,SUMMARIZATION,USER_PREFERENCE \
+  --memory-event-expiry-days 30 \
+  --allowed-tools "*"</code></pre>
+            </div>
+            <p>This gives you one Gateway tool (<code>listing-ops</code>) and the Browser tool. You still need the second Gateway (<code>market-data</code>, read-only) and the two <code>inline_function</code> tools. Open <code>app/brokerAgent_${WORKSHOP_ID}/harness.json</code> and add these three entries to the <code>tools</code> array, alongside what the CLI already generated.</p>
+            <div class="fill-in">
+              <span class="tag">Fill in</span>
+              <p>Replace <code>&lt;gw-readonly ARN from Phase 1&gt;</code> below with the same <code>gw-readonly-${WORKSHOP_ID}</code> ARN you used for the investor harness in step 1.5. It is the same read-only Gateway, reused here.</p>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>{
+  "type": "agentcore_gateway",
+  "name": "market-data",
+  "config": {
+    "agentCoreGateway": {
+      "gatewayArn": "<mark class="fillmark">&lt;gw-readonly ARN from Phase 1&gt;</mark>",
+      "outboundAuth": { "awsIam": {} }
+    }
+  }
+},
+{
+  "type": "inline_function",
+  "name": "confirm_listing_change",
+  "config": {
+    "inlineFunction": {
+      "description": "Ask the signed-in broker to confirm an exact listing price change before it is committed. Call this BEFORE update_listing_price, once you have the old and new price.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listingId": { "type": "string" },
+          "oldPrice": { "type": "number" },
+          "newPrice": { "type": "number" }
+        },
+        "required": ["listingId", "oldPrice", "newPrice"]
+      }
+    }
+  }
+},
+{
+  "type": "inline_function",
+  "name": "get_legacy_credentials",
+  "config": {
+    "inlineFunction": {
+      "description": "Get the login credentials for the signed-in broker's account on the legacy deal desk (a separate, no-API system reachable only through the browser tool). Call this once, before navigating there with the browser tool.",
+      "inputSchema": { "type": "object", "properties": {} }
+    }
+  }
+}</code></pre>
+            </div>
+            <p><code>inline_function</code> tools pause the harness and hand control back to whoever calls <code>InvokeHarness</code>, which is your own backend, to actually resolve them. That is why these two exist as backend Python functions (<code>backend/confirmation.py</code>'s <code>resolve_legacy_credentials</code> and <code>mint_price_change_approval</code>) rather than Lambda-backed Gateway targets. This is a structural part of how AgentCore works, not a design choice you can skip.</p>
+            <p>Also confirm <code>allowedTools</code> in the same file is set to <code>["*"]</code> (the CLI should have set this already from <code>--allowed-tools "*"</code> above).</p>
+            <p>Confirm all five tools actually landed before moving on. It is easy for a pasted JSON block to silently miss the array:</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>python3 -c "
+import json
+tools = json.load(open('app/brokerAgent_${WORKSHOP_ID}/harness.json'))['tools']
+print([t['name'] for t in tools])
+"</code></pre>
+            </div>
+            <div class="note">You should see <code>['gateway', 'browser', 'market-data', 'confirm_listing_change', 'get_legacy_credentials']</code> (the first name may differ if you renamed it). If <code>market-data</code> is missing, the broker will have no way to search or browse listings at all. It will say so honestly rather than invent any, but the fix is just adding the block above.</div>
+
+            <p style="margin-top:16px;">Now write the real system prompt. First, get your legacy desk URL:</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Legacy" \
+  --query "Stacks[0].Outputs[?OutputKey=='LegacyDeskUrl'].OutputValue" --output text</code></pre>
+            </div>
+            <div class="fill-in">
+              <span class="tag">Fill in, after writing the file</span>
+              <p>The heredoc below still has the literal placeholder text <code>&lt;your legacy desk URL&gt;</code> on one line. Write the file first, then run the <code>sed</code> command right after it to substitute the real value from the command above. You do not need to hand-edit the heredoc itself, just do not skip the follow-up step.</p>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>cat &gt; app/brokerAgent_${WORKSHOP_ID}/system-prompt.md &lt;&lt;'EOF'
+You are CREXi's broker-facing assistant for commercial real estate. You help
+brokers review and update their own listings.
+
+Grounding rules:
+- Never state a property name, address, unit count, price, or any figure
+  that did not come from a tool call this turn. If unsure a property
+  exists, call search_listings or get_listing to check.
+- get_change_log shows the recorded history of changes to a listing --
+  who changed what, and when.
+- Never state internal system data: listing IDs (e.g. "westerville-park"),
+  database version numbers, approval tokens, session IDs, raw tool-call
+  statuses, or internal timestamps. Refer to a property only by its name.
+  If a listing was recently changed, say so in plain language and, if
+  asked, summarize get_change_log's entries in plain language (who, what,
+  when) -- never cite a version number or internal record ID as evidence.
+- get_legacy_credentials, confirm_listing_change, get_change_log, and
+  update_listing_price are tools you ALREADY have, on every turn -- never
+  search for them, and never conclude one is unavailable because a tool
+  search didn't return it. Only market-data's and listing-ops's own
+  sub-tools are behind x_amz_bedrock_agentcore_search; your other tools
+  require no discovery step at all.
+
+The legacy deal desk (rent roll, concessions, deferred maintenance):
+- This information exists ONLY in a separate legacy system with no API --
+  <mark class="fillmark">&lt;your legacy desk URL&gt;</mark> --
+  reachable only through the browser tool, as the signed-in broker.
+- Call get_legacy_credentials first (no arguments) to authorize access
+  for the CURRENT broker. Call it BY ITSELF, as the only tool call in
+  that turn -- never alongside another tool call (e.g. not in parallel
+  with get_listing or search_listings).
+- Its result is one of two shapes:
+  - {"accessToken": ...} -- you're authorized. Use the browser tool to
+    navigate directly to &lt;legacy desk URL&gt;/sso?access_token=&lt;the token&gt;,
+    which logs you in and redirects to the dashboard. Then navigate to
+    ?listing=&lt;listingId&gt; to read the rent roll, concessions, and
+    deferred maintenance notes for that property.
+  - The browser tool's session does not reliably survive from the /sso
+    navigation to the next navigation -- if the page you land on after
+    navigating to ?listing=&lt;listingId&gt; is the sign-in page instead of
+    the listing's data (check the page content, don't assume), this is
+    expected and not an error to report to the broker. Silently recover
+    every time it happens: call get_legacy_credentials again for a
+    fresh accessToken, navigate to /sso?access_token=&lt;the new token&gt;
+    again, and only then retry ?listing=&lt;listingId&gt;. Do this recovery
+    automatically, without asking the broker or narrating it as a
+    problem -- from their perspective the data should just arrive.
+  - {"authorizationRequired": true, "authorizationUrl": ...} -- this is
+    the broker's FIRST time this session (or their prior authorization
+    expired). Tell the broker plainly that you need their one-time
+    authorization to reach the legacy deal desk, give them the exact
+    authorizationUrl to open in their OWN browser (not the one you
+    drive), and ask them to let you know once they've signed in and
+    approved. Do NOT call any other tool this turn. Once they confirm,
+    call get_legacy_credentials again -- it will now return a real
+    accessToken with no repeat authorization needed for the rest of
+    this broker's sessions, until it eventually expires.
+  - Reproduce authorizationUrl EXACTLY, character for character -- it is
+    an opaque, case-sensitive identifier, not a normal word, and it will
+    stop working if even one letter's capitalization changes. Do not
+    "clean up" or re-capitalize any part of it (e.g. never turn
+    "request_uri" into "request_URI") the way you might with an ordinary
+    acronym in prose. Copy it verbatim into a markdown link.
+- NEVER print the access token itself in your reply to the user (the
+  authorizationUrl is fine and expected to share). Treat the token the
+  same way you would treat any other secret you are handed to complete
+  a task, not information to relay -- use it immediately and only as
+  the browser tool's navigation target above.
+- Use this system when the broker's question needs information that
+  search_listings / get_listing / get_document_text cannot answer (e.g.
+  occupancy, in-place rent, concessions granted, deferred maintenance).
+
+Changing a listing's asking price:
+- Always call get_listing to get the CURRENT price fresh, right before
+  proposing a change -- even if you recall a price from earlier in this
+  conversation or from get_change_log. get_change_log is history, not
+  current state, and may not reflect the latest price. Never skip or
+  decline a requested change because change history looks like it
+  already happened; only get_listing's current askingPrice is
+  authoritative.
+- Once you know the current price (from that fresh get_listing call)
+  and the broker has told you the new price they want, call
+  confirm_listing_change with
+  (listingId, oldPrice, newPrice) BEFORE calling update_listing_price.
+  This pauses for the broker to explicitly confirm the exact change.
+  Call confirm_listing_change BY ITSELF, never in parallel with another
+  tool call in the same turn.
+- confirm_listing_change's result tells you whether the broker approved
+  and, if so, gives you an approvalToken. You must pass that exact token
+  to update_listing_price -- never invent one, never reuse an old one.
+- If the broker did not approve, or update_listing_price returns an
+  error (expired, already used, or mismatched token), tell the broker
+  plainly and ask them to reconfirm -- do not retry with a guessed value.
+- After a successful write, tell the broker the change is recorded and,
+  if asked, show the change-log entry via get_change_log.
+
+Style:
+- Be concise and professional. No emojis or decorative symbols.
+- Never paste a raw file/download URL into your reply.
+EOF</code></pre>
+            </div>
+            <p>Then replace <code>&lt;your legacy desk URL&gt;</code> on the "This information exists ONLY..." line with the real URL you fetched above:</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>sed -i '' "s|<mark class="fillmark">&lt;your legacy desk URL&gt;</mark>|<mark class="fillmark">&lt;the real URL&gt;</mark>|" app/brokerAgent_${WORKSHOP_ID}/system-prompt.md</code></pre>
+            </div>
+            <div class="note">Everywhere else you see <code>&lt;legacy desk URL&gt;</code>, <code>&lt;the token&gt;</code>, or <code>&lt;the new token&gt;</code> inside that system prompt, leave them exactly as written. Those are instructions to the model about how to build a URL at runtime, not something you replace by hand.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p2-4"><span class="step-num">2.4</span><span class="step-title">Deploy and verify</span></div>
+          <div class="step-body">
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>agentcore validate
+agentcore deploy --yes --target $WORKSHOP_ID
+agentcore invoke --target $WORKSHOP_ID --harness brokerAgent_${WORKSHOP_ID} \
+  --user-id marcus "What listings do I have?"</code></pre>
+            </div>
+            <div class="note">You will not be able to fully verify the legacy-desk lookup yet, that needs Phase 3's OAuth setup first. Confirming <code>search_listings</code> and <code>get_listing</code> work here is enough for now.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== PHASE 3 ===================== -->
+      <section id="phase-3" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge">3</div>
+          <div>
+            <h2>Legacy portal OAuth</h2>
+            <div class="phase-sub">Checkpoint 4. Five steps, all plain AWS CLI, no agentcore CLI involved.</div>
+          </div>
+        </div>
+        <div class="phase-intro">
+          <p>The broker's <code>get_legacy_credentials</code> tool needs two AgentCore Identity resources: a <strong>workload identity</strong> and an <strong>OAuth2 credential provider</strong> pointing at a Cognito app client that <code>identity_stack.py</code> already created for exactly this purpose. These are Identity-service resources, not project resources, so nothing here touches <code>agentcore.json</code>.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p3-1"><span class="step-num">3.1</span><span class="step-title">Pull the values you need from the Identity stack</span></div>
+          <div class="step-body">
+            <p>Pull the Cognito app client's ID, secret, and endpoints into shell variables. You reuse these across the next three steps.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>IDENTITY_STACK="Crexi${WORKSHOP_ID}Identity"
+out() { aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK" \
+  --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+
+USER_POOL_ID=$(out UserPoolId)
+CLIENT_ID=$(out LegacyOAuthClientId)
+ISSUER=$(out LegacyOAuthIssuer)
+AUTH_ENDPOINT=$(out LegacyOAuthAuthorizationEndpoint)
+TOKEN_ENDPOINT=$(out LegacyOAuthTokenEndpoint)
+CLIENT_SECRET=$(aws cognito-idp describe-user-pool-client --user-pool-id "$USER_POOL_ID" \
+  --client-id "$CLIENT_ID" --query 'UserPoolClient.ClientSecret' --output text)</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p3-2"><span class="step-num">3.2</span><span class="step-title">Create the workload identity</span></div>
+          <div class="step-body">
+            <p>A workload identity is how AgentCore Identity lets the harness act on a specific broker's behalf without ever holding their password. It needs to know which URL it is allowed to redirect back to once OAuth completes.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>WORKLOAD_NAME="crexi${WORKSHOP_ID}legacyoauth"
+RETURN_URL="http://localhost:8000/oauth/legacy-callback"
+
+aws bedrock-agentcore-control create-workload-identity --name "$WORKLOAD_NAME"
+aws bedrock-agentcore-control update-workload-identity --name "$WORKLOAD_NAME" \
+  --allowed-resource-oauth2-return-urls "$RETURN_URL"</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p3-3"><span class="step-num">3.3</span><span class="step-title">Create the OAuth2 credential provider</span></div>
+          <div class="step-body">
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code># Same name as the workload identity, by convention
+PROVIDER_NAME="crexi${WORKSHOP_ID}legacyoauth"
+
+PROVIDER_CONFIG=$(python3 -c "
+import json
+print(json.dumps({'includedOauth2ProviderConfig': {
+    'clientId': '$CLIENT_ID', 'clientSecret': '$CLIENT_SECRET',
+    'issuer': '$ISSUER', 'authorizationEndpoint': '$AUTH_ENDPOINT',
+    'tokenEndpoint': '$TOKEN_ENDPOINT',
+}}))
+")
+
+aws bedrock-agentcore-control create-oauth2-credential-provider --name "$PROVIDER_NAME" \
+  --credential-provider-vendor "CognitoOauth2" --oauth2-provider-config-input "$PROVIDER_CONFIG"</code></pre>
+            </div>
+            <div class="note">The response includes a <code>callbackUrl</code>. Copy it, you need it in the next step.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p3-4"><span class="step-num">3.4</span><span class="step-title">Wire the callback URL back into Cognito</span></div>
+          <div class="step-body">
+            <p><code>update-user-pool-client</code> replaces the <strong>whole</strong> OAuth config, not just the callback list, so re-specify every setting or this silently clobbers the client's flows and scopes.</p>
+            <div class="fill-in">
+              <span class="tag">Fill in</span>
+              <p>Replace <code>&lt;the callbackUrl from 3.3&gt;</code> with the exact <code>callbackUrl</code> value from step 3.3's response.</p>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>aws cognito-idp update-user-pool-client \
+  --user-pool-id "$USER_POOL_ID" --client-id "$CLIENT_ID" \
+  --allowed-o-auth-flows "code" --allowed-o-auth-scopes "openid" "email" \
+  --allowed-o-auth-flows-user-pool-client --supported-identity-providers "COGNITO" \
+  --callback-urls "https://example.com/callback" "<mark class="fillmark">&lt;the callbackUrl from 3.3&gt;</mark>"</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p3-5"><span class="step-num">3.5</span><span class="step-title">Sanity check</span></div>
+          <div class="step-body">
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>aws bedrock-agentcore-control get-workload-identity --name "$WORKLOAD_NAME"
+aws bedrock-agentcore-control get-oauth2-credential-provider --name "$PROVIDER_NAME"</code></pre>
+            </div>
+            <div class="note">Both should show up cleanly, with the credential provider showing <code>"status": "READY"</code>.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== PHASE 4 ===================== -->
+      <section id="phase-4" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge">4</div>
+          <div>
+            <h2>Backend wiring</h2>
+            <div class="phase-sub">Give the frontend and backend the real ARNs and IDs for everything you just built.</div>
+          </div>
+        </div>
+        <div class="phase-intro">
+          <p>Everything you built by hand across Phases 0 to 3 now needs to land in <code>backend/.env</code> so the app can actually talk to it.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p4-1"><span class="step-num">4.1</span><span class="step-title">Discover and write the environment file</span></div>
+          <div class="step-body">
+            <p>This command discovers your two harness ARNs through <code>agentcore status</code>, your Cognito pool and client, and assumes your Phase 3 resources are named <code>crexi${WORKSHOP_ID}legacyoauth</code>, exactly as steps 3.2 and 3.3 had you name them.</p>
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p4-2"><span class="step-num">4.2</span><span class="step-title">Confirm every value landed</span></div>
+          <div class="step-body">
+            <p>Open <code>backend/.env</code> and confirm all seven values are non-empty before continuing. A blank value means one of the earlier phases used a different name than this command expects.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><input type="checkbox" class="step-check" data-id="p4-3"><span class="step-num">4.3</span><span class="step-title">Start the app</span></div>
+          <div class="step-body">
+            <div class="code-block">
+              <button class="copy-btn">Copy</button>
+              <pre><code>make dev</code></pre>
+            </div>
+            <div class="note">This starts the FastAPI backend on <code>:8000</code> and the Vite frontend on <code>:5173</code>. Open <strong>http://localhost:5173</strong> and log in as <code>dana</code> (investor) or <code>marcus</code> (broker). Passwords are derived from your <code>WORKSHOP_SECRET</code>, using the same formula as the main README's Logging in section.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== VERIFY ===================== -->
+      <section id="verify" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge" style="background:var(--lime-deep); color:var(--charcoal);">&#10003;</div>
+          <div>
+            <h2>Verification checklist</h2>
+            <div class="phase-sub">Try each of these once the app is running. Tick a box off once it behaves as described.</div>
+          </div>
+        </div>
+        <div class="phase-intro">
+          <p>The <code>&lt;a listing&gt;</code>, <code>&lt;a number&gt;</code>, and <code>&lt;two properties&gt;</code> references below are not values from an earlier step. Pick any real listing name or price you see once the app is running, and use that when you type the prompt into the chat UI.</p>
+          <div class="note">If any item fails and you are not sure why, run <code>agentcore invoke ... --verbose</code>. It streams every tool call and result the model makes for that turn. Check the tool <code>name</code> in the first <code>contentBlockStart</code>. If it is <code>code_interpreter</code> when you expected a Gateway tool, the model never saw the real tool, see Troubleshooting below. If the model is honest about not having a tool rather than inventing data, that is also a config gap, not a prompt problem.</div>
+        </div>
+        <ul class="check-list">
+          <li><input type="checkbox" class="step-check" data-id="v1"><span><strong>Investor:</strong> "What multi-family listings are available in Columbus?" returns real listings.</span></li>
+          <li><input type="checkbox" class="step-check" data-id="v1b"><span><strong>Investor:</strong> <code>agentcore run eval</code> (step 1.7) against that session prints a <code>Builtin.Helpfulness</code> score and writes a results JSON file.</span></li>
+          <li><input type="checkbox" class="step-check" data-id="v2"><span><strong>Investor:</strong> "Run underwriting on &lt;two properties&gt;, minimum cap rate 6.5%." goes through a visible Code Interpreter tool call, not just the model typing numbers.</span></li>
+          <li><input type="checkbox" class="step-check" data-id="v3"><span><strong>Broker:</strong> "What listings do I have?" returns only marcus's own listings.</span></li>
+          <li><input type="checkbox" class="step-check" data-id="v4"><span><strong>Broker:</strong> "Change the asking price on &lt;a listing&gt; to &lt;a number&gt;." pauses for your explicit confirmation before writing anything.</span></li>
+          <li><input type="checkbox" class="step-check" data-id="v5"><span><strong>Broker:</strong> "Check the rent roll for &lt;a listing&gt; on the legacy deal desk." First time, returns an authorization link. Open it, sign in, grant consent, and the chat resumes on its own within a few seconds with real rent-roll, concessions, and deferred-maintenance data.</span></li>
+        </ul>
+      </section>
+
+      <!-- ===================== LIMITATIONS ===================== -->
+      <section id="limitations" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge">i</div>
+          <div>
+            <h2>Known limitations</h2>
+          </div>
+        </div>
+        <div class="callout warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#222F30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+          <p>The Legacy Portal OAuth access token travels as a <code>?access_token=</code> URL query parameter, not a cookie or a header. This is a deliberate workshop simplification. The harness's built-in Browser tool only exposes human-like actions such as navigate, click, and type, so there is no way for the model to set a cookie or header directly. In production, you would mint a short-lived, single-use exchange code instead, the same pattern <code>confirm_listing_change</code> already uses for price-change approvals, so the real bearer token never lands in an access log or a browser session recording.</p>
+        </div>
+      </section>
+
+      <!-- ===================== TROUBLESHOOTING ===================== -->
+      <section id="troubleshooting" class="phase">
+        <div class="phase-head">
+          <div class="phase-badge">?</div>
+          <div>
+            <h2>Troubleshooting</h2>
+            <div class="phase-sub">If you get well and truly stuck, the reference branch has a fully working, automated version of everything above. Useful as an answer key, not something to copy wholesale. The point is building it yourself.</div>
+          </div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th style="width:38%;">Symptom</th><th>Likely cause</th></tr></thead>
+          <tbody>
+            <tr><td><code>agentcore add gateway</code> / <code>add harness</code> fails, or complains about a missing project</td><td>You are not in the repo root, or Phase 0 was not completed. Confirm <code>agentcore/agentcore.json</code> exists and has your project name.</td></tr>
+            <tr><td><code>agentcore create</code> also generated <code>app/crexiWorkshopV2/main.py</code></td><td>You forgot <code>--no-agent</code>. Delete that stray directory (it is an unrelated runtime-agent skeleton, not a harness) and re-run Phase 0 with the flag.</td></tr>
+            <tr><td><code>Invalid harness configuration: ... config file not found</code></td><td>Your harness's <code>name</code> in <code>agentcore.json</code> does not match its directory under <code>app/</code>. <code>agentcore add harness</code> keeps these in sync automatically. If you hand-edited <code>harness.json</code>'s <code>name</code> afterward, the directory was not renamed to match.</td></tr>
+            <tr><td><code>create-oauth2-credential-provider</code> complains about a missing vendor</td><td><code>--credential-provider-vendor "CognitoOauth2"</code> is required and easy to drop when copy-pasting partial commands. Check it is present.</td></tr>
+            <tr><td><code>create-oauth2-credential-provider</code> fails with <code>Invalid length for parameter name, value: 0</code>, often preceded by <code>zsh: command not found: #</code></td><td>A variable assignment followed by a same-line <code>#</code> comment was pasted into zsh, which does not treat <code>#</code> as a comment in interactive mode by default. The assignment silently does not stick, so the next command runs with an empty variable. Re-set the variable (e.g. <code>export PROVIDER_NAME=crexi${WORKSHOP_ID}legacyoauth</code>) and re-run.</td></tr>
+            <tr><td>Broker's legacy-desk step returns "Invalid or expired access token"</td><td>Your <code>LegacyDeskUrl</code> (patched into <code>system-prompt.md</code> in step 2.3) or your <code>LEGACY_OAUTH_*</code> names in <code>backend/.env</code> do not match what you actually created in Phase 3. Re-check both against the exact <code>WORKSHOP_ID</code>-suffixed names used above.</td></tr>
+            <tr><td><code>infra/.venv</code> or <code>backend/.venv</code> exists but <code>pip install</code> fails inside it</td><td>The venv is present but broken, often left over from a system Python upgrade. Run <code>rm -rf infra/.venv backend/.venv</code> and re-run <code>make bootstrap</code> or <code>make wire-backend-env</code>. <code>scripts/vendor-deps.sh</code> recreates them cleanly.</td></tr>
+            <tr><td>A harness call fails with <code>Unknown tool: &lt;name&gt;</code> after adding a custom tool</td><td><code>allowedTools</code> needs an <code>@</code>-prefixed reference for anything that is not one of AWS's fixed built-ins (e.g. <code>@market-data/*</code>, <code>@code-interpreter</code>). A bare name only matches built-in tool identifiers.</td></tr>
+            <tr><td><code>agentcore deploy</code> fails with <code>Property value [...] does not match pattern ^arn:aws...</code> on a harness's <code>GatewayArn</code></td><td>You passed the gateway's bare name or ID to <code>--gateway-arn</code> instead of the full ARN from step 1.4's <code>identifier</code> field. Since deploy failed before AWS created anything, remove the bad harness locally and re-add it: <code>agentcore remove harness --name investorAgent_${WORKSHOP_ID} --yes</code>, then re-run <code>agentcore add harness</code> with the correct full ARN and redeploy.</td></tr>
+            <tr><td>The harness deploys and responds, but invents listings instead of calling <code>search_listings</code>, or says outright it has no data-search tool</td><td>Its Gateway tool's <code>name</code> in <code>harness.json</code> does not match the <code>@</code>-prefixed reference in <code>allowedTools</code> (it defaults to <code>"gateway"</code>, but <code>allowedTools</code> says <code>@market-data/*</code>). The Gateway's sub-tools never reach the model. Rename the tool entry's <code>name</code> to <code>"market-data"</code> per step 1.5 and redeploy. Confirm with <code>agentcore invoke ... --verbose</code> that the trace shows a <code>market-data___search_listings</code> or <code>x_amz_bedrock_agentcore_search</code> call, not just <code>code_interpreter</code>.</td></tr>
+            <tr><td><code>make dev</code> says <code>backend/.env not found</code></td><td>Run <code>make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID</code>, Phase 4 above. Nothing writes this file automatically on this branch.</td></tr>
+            <tr><td><code>agentcore add evaluator</code> succeeds and <code>agentcore status</code> shows it, but the evaluator never shows up in AWS</td><td>Confirmed gap on this branch: the CDK project <code>agentcore create</code> generates only wires <code>harnesses</code> and <code>agentCoreGateways</code> into the actual synth and deploy. <code>evaluators</code> register in <code>agentcore.json</code> but never reach AWS via <code>agentcore deploy</code>. Use a <code>Builtin.*</code> evaluator instead (step 1.7), it needs no deploy step at all.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer>
+        Built for the zeb AgentCore workshop. This page tracks your own checklist progress locally in this browser only, nothing here is transmitted anywhere.
+      </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var STORAGE_KEY = 'zeb-agentcore-progress-v1';
+  var checks = Array.prototype.slice.call(document.querySelectorAll('.step-check'));
+  var total = checks.length;
+
+  function load(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch(e){ return {}; }
+  }
+  function save(state){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch(e){}
+  }
+
+  var state = load();
+  checks.forEach(function(c){
+    var id = c.getAttribute('data-id');
+    if (id && state[id]) c.checked = true;
+  });
+
+  function phaseComplete(phaseNum){
+    var prefix = 'p' + phaseNum + '-';
+    var relevant = checks.filter(function(c){
+      var id = c.getAttribute('data-id') || '';
+      return id.indexOf(prefix) === 0;
+    });
+    if (!relevant.length) return false;
+    return relevant.every(function(c){ return c.checked; });
+  }
+
+  function updateNavDots(){
+    document.querySelectorAll('.sidenav a[data-phase]').forEach(function(a){
+      var n = a.getAttribute('data-phase');
+      if (phaseComplete(n)) { a.classList.add('done'); a.querySelector('.navdot').textContent = ''; }
+      else { a.classList.remove('done'); }
+    });
+  }
+
+  function updateProgress(){
+    var done = checks.filter(function(c){ return c.checked; }).length;
+    var pct = total ? Math.round((done/total)*100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = done + ' of ' + total;
+    updateNavDots();
+  }
+
+  checks.forEach(function(c){
+    c.addEventListener('change', function(){
+      var id = c.getAttribute('data-id');
+      if (id) { state[id] = c.checked; save(state); }
+      updateProgress();
+    });
+  });
+  updateProgress();
+
+  /* copy buttons */
+  document.querySelectorAll('.copy-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var block = btn.closest('.code-block');
+      var codeEl = block.querySelector('code');
+      var text = codeEl.textContent;
+      function done(){
+        var original = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(function(){ btn.textContent = original; btn.classList.remove('copied'); }, 1400);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function(){
+          fallbackCopy(text); done();
+        });
+      } else {
+        fallbackCopy(text); done();
+      }
+    });
+  });
+  function fallbackCopy(text){
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  /* mobile nav toggle */
+  var sidenav = document.getElementById('sidenav');
+  var toggle = document.getElementById('navToggle');
+  toggle.addEventListener('click', function(){ sidenav.classList.toggle('open'); });
+  sidenav.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click', function(){ sidenav.classList.remove('open'); });
+  });
+
+  /* active section highlight */
+  var sections = Array.prototype.slice.call(document.querySelectorAll('main section[id]'));
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('.sidenav a'));
+  function onScroll(){
+    var offset = 90;
+    var current = sections[0];
+    for (var i=0;i<sections.length;i++){
+      if (sections[i].getBoundingClientRect().top - offset <= 0) current = sections[i];
+    }
+    navLinks.forEach(function(a){
+      var href = a.getAttribute('href').slice(1);
+      a.classList.toggle('active', current && current.id === href);
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+
+</body>
+</html>
