@@ -2,7 +2,7 @@
 
 **This is the workshop branch.** `make bootstrap` here only deploys the CDK baseline (data, identity, legacy
 desk, tool Lambdas, observability) — every AgentCore-native piece (Gateways, harnesses, and the Legacy Portal
-OAuth workload identity/credential provider) you build **by hand**, following **[WALKTHROUGH.md](WALKTHROUGH.md)**.
+OAuth workload identity/credential provider) you build **by hand**, following **[WORKSHOP_GUIDE.md](WORKSHOP_GUIDE.md)**.
 That hands-on work is the actual point of the workshop. If you'd rather see a fully automated one-command deploy
 end to end for reference, that's the `reference` branch — not this one.
 
@@ -102,6 +102,10 @@ that's unique to you (e.g. your name or initials + a number: `jsmith01`). Pick a
 it deterministically derives your two test users' passwords (see [Logging in](#logging-in)), so nobody needs to
 hand you a password.
 
+> **Fill in before running:** `jsmith01` and `some-secret-only-you-know` below are just examples — replace them
+> with your own `WORKSHOP_ID` and `WORKSHOP_SECRET`, and remember the exact values, since you'll need to re-export
+> them in every new terminal and paste the secret again when computing your login password below.
+
 ```bash
 export WORKSHOP_ID=jsmith01
 export WORKSHOP_SECRET=some-secret-only-you-know
@@ -113,7 +117,7 @@ make bootstrap WORKSHOP_ID=$WORKSHOP_ID WORKSHOP_SECRET=$WORKSHOP_SECRET
 
 On first run, `make bootstrap` also provisions `infra/.venv`, `backend/.venv`, and `frontend/node_modules`, then
 deploys 5 CDK stacks (data, identity, legacy desk, tool Lambdas, observability) — **and stops there.** There is no
-`agentcore/` or `app/` directory yet at this point; you create both from scratch in WALKTHROUGH.md's Phase 0. Everything after this is manual: open **[WALKTHROUGH.md](WALKTHROUGH.md)** and work through
+`agentcore/` or `app/` directory yet at this point; you create both from scratch in WORKSHOP_GUIDE.md's Phase 0. Everything after this is manual: open **[WORKSHOP_GUIDE.md](WORKSHOP_GUIDE.md)** and work through
 building the investor harness, the broker harness, and the Legacy Portal OAuth setup by hand. Only once the
 walkthrough has you run `make wire-backend-env` does `make dev` (FastAPI backend on `:8000`, Vite frontend on
 `:5173`, open **http://localhost:5173**) become meaningful.
@@ -122,6 +126,9 @@ walkthrough has you run `make wire-backend-env` does `make dev` (FastAPI backend
 
 Two users are seeded automatically: `dana` (investors group) and `marcus` (brokers group). Their password is
 derived from your `WORKSHOP_SECRET` — compute it yourself, it's never stored anywhere:
+
+> **Fill in before running:** replace `some-secret-only-you-know` below with the exact `WORKSHOP_SECRET` you used
+> in `make bootstrap` above — a different value produces a different (wrong) password.
 
 ```bash
 python3 -c "
@@ -175,21 +182,21 @@ by directly inspecting the synthesized CloudFormation template and the CLI's own
    (`AgentCore-crexiWorkshopV2-<id>`) — but every *physical name* inside that stack (Gateway Name, Harness Name, and
    the harness's own IAM Role name) is a literal string, **not** namespaced by the target automatically. Two
    participants both naming a harness literally `investorAgent` would collide on the same IAM Role even in separate
-   stacks — **this is why WALKTHROUGH.md has you suffix every resource name you create by hand with your own
+   stacks — **this is why WORKSHOP_GUIDE.md has you suffix every resource name you create by hand with your own
    `WORKSHOP_ID`** (e.g. `investorAgent_jsmith01`), not just accept a tool's default suggestion.
 
 2. A harness's Gateway reference (`tools[].config.agentCoreGateway.gatewayArn`) is a **resolved literal ARN**, not
    an in-stack CDK reference — and AWS only assigns that ARN once the Gateway actually exists. This is why
-   WALKTHROUGH.md has you create your Gateways *before* the harness that references them, not the other way round.
+   WORKSHOP_GUIDE.md has you create your Gateways *before* the harness that references them, not the other way round.
 
 3. `agentcore validate` derives a harness's config directory from its registry `name` as `app/<name>/harness.json`
    — not the schema's own separate `path` field, so each harness you create by hand needs its own directory
-   matching its name. WALKTHROUGH.md's steps handle this as part of `agentcore add harness`/the atomic CLI
+   matching its name. WORKSHOP_GUIDE.md's steps handle this as part of `agentcore add harness`/the atomic CLI
    commands.
 
 4. `app/brokerAgent_<id>/system-prompt.md` names the legacy deal desk's Lambda Function URL as literal text, for
    the model to navigate the Browser tool to. That URL is unique per participant (`LegacyStack`'s `LegacyDeskUrl`
-   output) — WALKTHROUGH.md has you paste your own into the prompt.
+   output) — WORKSHOP_GUIDE.md has you paste your own into the prompt.
 
 If you ever see a broker harness fail to log into the legacy desk, or an investor harness returning another
 participant's listings, one of these four is the first thing to check — it almost certainly means a resource name
@@ -199,7 +206,7 @@ or URL was copied from someone else's example instead of your own `WORKSHOP_ID`'
 
 `make bootstrap` only does the CDK baseline. `make deploy WORKSHOP_ID=$WORKSHOP_ID` is a plain passthrough to
 `agentcore deploy` for whatever you've built by hand so far — use it after any harness/gateway change per
-WALKTHROUGH.md. Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` afterward too if that change touched a
+WORKSHOP_GUIDE.md. Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` afterward too if that change touched a
 harness ARN.
 
 ### Backend wiring
@@ -208,7 +215,7 @@ harness ARN.
 identity/provider names from environment variables, falling back to a fixed set of `dev01` values that only exist
 so the module imports cleanly — **they are not a valid target for anyone else to run against.** Run
 `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` yourself once you've built the harnesses and the OAuth resources
-per WALKTHROUGH.md — it writes a real `backend/.env` by discovering your harness ARNs (via `agentcore status`) and
+per WORKSHOP_GUIDE.md — it writes a real `backend/.env` by discovering your harness ARNs (via `agentcore status`) and
 assuming your OAuth workload identity/credential provider are named `crexi<WORKSHOP_ID>legacyoauth`, exactly as
 the walkthrough has you name them.
 
@@ -217,7 +224,7 @@ the walkthrough has you name them.
 Checkpoint 4's broker agent authorizes access to the legacy deal desk through a real per-user OAuth flow via
 AgentCore Identity's Token Vault, not a stored password. On this branch, you create the two AgentCore Identity
 resources this needs — a workload identity and an OAuth2 credential provider pointing at the `LegacyOAuthAppClient`
-Cognito app client from `identity_stack.py` — by hand, via WALKTHROUGH.md's Phase 3. That hands-on AgentCore
+Cognito app client from `identity_stack.py` — by hand, via WORKSHOP_GUIDE.md's Phase 3. That hands-on AgentCore
 Identity work is a deliberate teaching moment, not an oversight.
 
 The first time you actually chat as marcus and ask about a listing's rent roll, `get_legacy_credentials` will
@@ -252,11 +259,11 @@ deliberate simplification called out there and in Known Limitations below.
 | `effective region is 'X', not us-west-2` | `AWS_REGION`/`AWS_DEFAULT_REGION` in your shell is overriding an otherwise-correctly-configured AWS CLI profile. |
 | `CDK not bootstrapped` | Run `cdk bootstrap` once for your account/region. |
 | `agentcore --version` prints nothing useful | An old `pip install bedrock-agentcore-starter-toolkit` is shadowing the real npm `agentcore` CLI on `PATH`. |
-| `Invalid harness configuration: ... config file not found` | `agentcore.json`'s harness `path` doesn't match a real directory — check the harness's `name`/`path` against WALKTHROUGH.md's naming convention before the next `agentcore deploy`. |
+| `Invalid harness configuration: ... config file not found` | `agentcore.json`'s harness `path` doesn't match a real directory — check the harness's `name`/`path` against WORKSHOP_GUIDE.md's naming convention before the next `agentcore deploy`. |
 | Broker's legacy-desk `/sso` login fails ("Invalid or expired access token") | The legacy desk URL pasted into the broker's system prompt points at a different participant's deployment (copied from an example instead of your own `LegacyStack`'s `LegacyDeskUrl` output), whose OAuth pool doesn't recognize your token. |
-| `make dev` says `backend/.env not found` | Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` once you've built the harnesses and OAuth resources per WALKTHROUGH.md — nothing writes this file automatically on this branch. |
+| `make dev` says `backend/.env not found` | Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` once you've built the harnesses and OAuth resources per WORKSHOP_GUIDE.md — nothing writes this file automatically on this branch. |
 | `pip install` failures during `make bootstrap` | First-run setup: `make bootstrap` provisions `infra/.venv`, `backend/.venv`, and `frontend/node_modules` on its own the first time it runs (a few extra minutes) — no manual install needed. If it still fails, you likely have no network access to PyPI/npm (corporate proxy/firewall); fix that and re-run `make bootstrap`, which is safe to retry. |
-| `sh: tsc: command not found` during Phase 0/`agentcore deploy` | `agentcore/cdk`'s own `npm install` (WALKTHROUGH.md Phase 0) didn't complete — re-run `cd agentcore/cdk && npm install`. |
+| `sh: tsc: command not found` during Phase 0/`agentcore deploy` | `agentcore/cdk`'s own `npm install` (WORKSHOP_GUIDE.md Phase 0) didn't complete — re-run `cd agentcore/cdk && npm install`. |
 | `uvicorn`/Vite fails with `Address already in use` on `:8000` or `:5173` | A previous `make dev` (yours or a leftover process) is still holding the port — find it with `lsof -i :8000` and stop that specific process, then re-run `make dev`. Don't `pkill` by name; that can kill an unrelated process reusing the same command name. |
 | A harness call fails with `Unknown tool: <name>` after you added a custom tool | `harness.json`'s `allowedTools` needs an `@`-prefixed reference for any tool that isn't one of AWS's fixed built-ins (e.g. `@my-custom-tool`, matching how Gateway tools are already listed as `@market-data/*`) — a bare name in `allowedTools` only matches AWS's built-in tool identifiers and silently rejects everything else before it dispatches. |
 
@@ -265,8 +272,8 @@ deliberate simplification called out there and in Known Limitations below.
 ```
 crexiWorkshopV2/
 ├── Makefile                    # preflight, bootstrap (CDK only), deploy, seed, dev, destroy
-├── WALKTHROUGH.md               # Everything AgentCore-native: build it here, by hand
-├── (no agentcore/ or app/ yet -- WALKTHROUGH.md's Phase 0 creates agentcore/, later phases create app/)
+├── WORKSHOP_GUIDE.md            # Everything AgentCore-native: build it here, by hand
+├── (no agentcore/ or app/ yet -- WORKSHOP_GUIDE.md's Phase 0 creates agentcore/, later phases create app/)
 ├── infra/                      # CDK: Data, Identity, Legacy, Tools, Observability stacks
 ├── services/
 │   ├── mcp_market_data/        # Lambda: search_listings, get_listing, get_market_comps, documents
@@ -279,9 +286,9 @@ crexiWorkshopV2/
     ├── preflight.sh
     ├── vendor-deps.sh
     ├── ensure-aws-target.sh / remove-aws-target.sh
-    └── wire-backend-env.sh      # Assumes you named things per WALKTHROUGH.md's convention
+    └── wire-backend-env.sh      # Assumes you named things per WORKSHOP_GUIDE.md's convention
 ```
 
-After WALKTHROUGH.md's Phase 0, you'll also have `agentcore/` (your project config + its own generated CDK
+After WORKSHOP_GUIDE.md's Phase 0, you'll also have `agentcore/` (your project config + its own generated CDK
 tooling) and, from Phases 1-2, `app/investorAgent_<id>/` and `app/brokerAgent_<id>/` (your two harnesses' configs
 and system prompts).

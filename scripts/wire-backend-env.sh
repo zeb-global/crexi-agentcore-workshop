@@ -32,7 +32,7 @@ APP_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK
   --query "Stacks[0].Outputs[?OutputKey=='AppClientId'].OutputValue" --output text)
 
 # Checkpoint 4 / Legacy Portal OAuth: on this branch, the workload identity
-# and credential provider are created BY HAND per WALKTHROUGH.md's Phase 3,
+# and credential provider are created BY HAND per WORKSHOP_GUIDE.md's Phase 3,
 # using this exact naming convention -- must match what you named them, or
 # backend/.env will point at resources that don't exist.
 LEGACY_OAUTH_WORKLOAD_NAME="crexi${WORKSHOP_ID}legacyoauth"

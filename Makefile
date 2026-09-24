@@ -23,7 +23,7 @@ vendor-deps:
 # This is the WORKSHOP branch's bootstrap -- CDK stacks only
 # (data/identity/legacy/tools/observability). It deliberately stops here:
 # everything AgentCore-native (gateways, harnesses, the Legacy Portal OAuth
-# workload identity/credential provider) is built by hand, per WALKTHROUGH.md
+# workload identity/credential provider) is built by hand, per WORKSHOP_GUIDE.md
 # -- that hands-on work is the actual point of the workshop. Compare the
 # REFERENCE branch's Makefile, where this same target goes on to do all of
 # that automatically.
@@ -36,12 +36,12 @@ bootstrap: vendor-deps
 		CDK_DEFAULT_REGION=$(AWS_REGION) \
 		cdk deploy --all --require-approval never
 	@echo ""
-	@echo "Base infrastructure deployed. Next: open WALKTHROUGH.md and build your"
+	@echo "Base infrastructure deployed. Next: open WORKSHOP_GUIDE.md and build your"
 	@echo "gateways, harnesses, and Legacy Portal OAuth setup by hand."
 
 # On the workshop branch this is a plain passthrough to the AgentCore CLI --
 # use it after any harness/gateway config change you make by hand, per
-# WALKTHROUGH.md. Nothing to render first; you already named everything
+# WORKSHOP_GUIDE.md. Nothing to render first; you already named everything
 # yourself when you created it.
 deploy:
 	@test -n "$(WORKSHOP_ID)" || (echo "Usage: make deploy WORKSHOP_ID=<id>"; exit 1)

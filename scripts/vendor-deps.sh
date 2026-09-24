@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sets up everything a fresh clone needs before `make bootstrap`'s own
 # CDK deploy can run, and everything `make dev` needs afterward. On this
-# branch, `agentcore/` doesn't exist yet at this point -- WALKTHROUGH.md's
+# branch, `agentcore/` doesn't exist yet at this point -- WORKSHOP_GUIDE.md's
 # Phase 0 creates it (via `agentcore create`) and installs its own
 # `agentcore/cdk/node_modules` there directly, since that directory isn't
 # here for this script to touch yet. Idempotent -- safe to re-run.

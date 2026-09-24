@@ -1,11 +1,23 @@
-# Workshop Walkthrough
+# Workshop Guide
 
 You've already run `make bootstrap WORKSHOP_ID=<id> WORKSHOP_SECRET=<secret>` — that deployed the CDK baseline
 (5 stacks: Data, Identity, Legacy, Tools, Observability) and nothing else. There is no `agentcore/` or `app/`
-directory in this repo yet — you create both from scratch below. Every command in this walkthrough is given as
+directory in this repo yet — you create both from scratch below. Every command in this guide is given as
 explicit, non-interactive CLI flags (not the interactive wizard) so it's exactly reproducible from this document.
 
-Set these once and keep them exported in every terminal you use for the rest of this walkthrough:
+## How to use this guide
+
+- Work through the phases **in order** — later phases assume earlier ones deployed successfully.
+- Every section explains **what you're about to do and why** before giving you a command to run. Read that
+  context first; it tells you what to expect and how to tell if it worked.
+- Some commands contain a placeholder like `<gw-readonly ARN from 1.4>` that you must replace with a real value
+  before running it. Every one of these is called out with a **"Fill in before running"** note directly above the
+  code block — look for that note, not just the angle brackets, since a couple of placeholders live inside a
+  larger block of text (e.g. a system prompt) rather than on their own line.
+- Commands are copy-paste ready assuming you `export WORKSHOP_ID=...` once, as shown next, and keep that same
+  terminal session (or re-export it in any new one) for the rest of the guide.
+
+Set these once and keep them exported in every terminal you use for the rest of this guide:
 
 ```bash
 export WORKSHOP_ID=<your workshop id>
@@ -144,12 +156,19 @@ EOF
 
 ### 1.2 — Create the read-only Gateway
 
+A Gateway is the AgentCore resource that turns a Lambda function into MCP tools a harness can call. This creates
+an empty one — IAM-authorized (`AWS_IAM`), so only your own harnesses can invoke it, not the public internet:
+
 ```bash
 agentcore add gateway --name gw-readonly-${WORKSHOP_ID} --protocol-type MCP \
   --authorizer-type AWS_IAM --exception-level NONE
 ```
 
 ### 1.3 — Attach the market-data Lambda as a target
+
+Now point that empty Gateway at the actual Lambda, using the schema you just wrote so AgentCore knows what tools
+to expose. First look up the Lambda's ARN (from the `Crexi${WORKSHOP_ID}Tools` stack you confirmed at the top of
+this guide), then attach it as a target:
 
 ```bash
 MARKET_DATA_ARN=$(aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Tools" \
@@ -187,6 +206,9 @@ Copy the ARN for `gw-readonly-${WORKSHOP_ID}` — you need it in the next step.
 `arn:aws:bedrock-agentcore:us-west-2:<account>:gateway/gw-readonly-kvj07-vzgzhckqbe`) — not the gateway's bare
 name/id. Passing the bare name passes CLI validation but fails later, at CDK deploy time, with a
 `does not match pattern ^arn:aws...` error.
+
+> **Fill in before running:** replace `<gw-readonly ARN from 1.4>` below with the exact ARN you copied at the end
+> of step 1.4.
 
 ```bash
 agentcore add harness --name investorAgent_${WORKSHOP_ID} \
@@ -360,6 +382,10 @@ EOF
 
 ### 2.2 — Gateway + target
 
+Same pattern as 1.2/1.3, but for the write-capable `listing-ops` Lambda, and rolled into one block: create the
+Gateway, deploy it so it exists, look up the Lambda's ARN, attach it as a target, then deploy again so the target
+exists too.
+
 ```bash
 agentcore add gateway --name gw-ops-${WORKSHOP_ID} --protocol-type MCP \
   --authorizer-type AWS_IAM --exception-level NONE
@@ -380,6 +406,9 @@ Fetch both Gateway ARNs (readonly from Phase 1, ops from just now) the same way 
 
 ### 2.3 — The harness itself
 
+> **Fill in before running:** replace `<gw-ops ARN from 2.2>` below with the `gw-ops-${WORKSHOP_ID}` ARN you
+> fetched at the end of step 2.2 (same `agentcore status --type gateway --json` pattern as step 1.4).
+
 ```bash
 agentcore add harness --name brokerAgent_${WORKSHOP_ID} \
   --model-provider bedrock --model-id us.anthropic.claude-sonnet-4-6 \
@@ -392,8 +421,11 @@ agentcore add harness --name brokerAgent_${WORKSHOP_ID} \
 
 This gives you one Gateway tool (`listing-ops`) and the Browser tool. You still need: the second Gateway
 (`market-data`, read-only) and the two `inline_function` tools. Open
-`app/brokerAgent_${WORKSHOP_ID}/harness.json` and add these two entries to the `tools` array (alongside what the
+`app/brokerAgent_${WORKSHOP_ID}/harness.json` and add these three entries to the `tools` array (alongside what the
 CLI already generated):
+
+> **Fill in before pasting:** replace `<gw-readonly ARN from Phase 1>` below with the same `gw-readonly-${WORKSHOP_ID}`
+> ARN you used for the investor harness in step 1.5 — it's the same read-only Gateway, reused here.
 
 ```json
 {
@@ -466,8 +498,12 @@ aws cloudformation describe-stacks --stack-name "Crexi${WORKSHOP_ID}Legacy" \
   --query "Stacks[0].Outputs[?OutputKey=='LegacyDeskUrl'].OutputValue" --output text
 ```
 
-Then write `app/brokerAgent_${WORKSHOP_ID}/system-prompt.md`, replacing `<your legacy desk URL>` on the line below
-with the real value from the command above:
+> **Fill in before running:** the heredoc below still has the literal placeholder text `<your legacy desk URL>`
+> on one line, deep inside "The legacy deal desk" section. You'll replace it with the real value from the command
+> above right after writing this file (a `sed` one-liner is given below the heredoc) — you don't need to hand-edit
+> the heredoc itself, just don't forget the follow-up step.
+
+Write `app/brokerAgent_${WORKSHOP_ID}/system-prompt.md` now:
 
 ```bash
 cat > app/brokerAgent_${WORKSHOP_ID}/system-prompt.md <<'EOF'
@@ -598,6 +634,9 @@ resources, not project (`agentcore.json`) resources.
 
 ### 3.1 — Pull the values you need from the Identity stack
 
+`identity_stack.py` already created a Cognito app client for exactly this OAuth flow. Pull its client ID/secret and
+endpoints into shell variables — you'll reuse them across the next three steps:
+
 ```bash
 IDENTITY_STACK="Crexi${WORKSHOP_ID}Identity"
 out() { aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK" \
@@ -613,6 +652,9 @@ CLIENT_SECRET=$(aws cognito-idp describe-user-pool-client --user-pool-id "$USER_
 ```
 
 ### 3.2 — Create the workload identity
+
+A workload identity is AgentCore Identity's way of letting the harness act on a specific broker's behalf without
+ever holding their password. It needs to know which URL it's allowed to redirect back to once OAuth completes:
 
 ```bash
 WORKLOAD_NAME="crexi${WORKSHOP_ID}legacyoauth"
@@ -649,6 +691,9 @@ The response includes a `callbackUrl` — copy it, you need it in the next step.
 `update-user-pool-client` replaces the **whole** OAuth config, not just the callback list — so re-specify every
 setting, or this silently clobbers the client's flows/scopes:
 
+> **Fill in before running:** replace `<the callbackUrl from 3.3>` below with the exact `callbackUrl` value from
+> 3.3's response.
+
 ```bash
 aws cognito-idp update-user-pool-client \
   --user-pool-id "$USER_POOL_ID" --client-id "$CLIENT_ID" \
@@ -670,13 +715,18 @@ Both should show up cleanly, the credential provider with `"status": "READY"`.
 
 ## Phase 4 — Backend Wiring
 
+The frontend/backend need real ARNs and IDs for everything you just built by hand, written into `backend/.env`.
+This command discovers your two harness ARNs (via `agentcore status`), your Cognito pool/client, and assumes your
+Phase 3 resources are named `crexi${WORKSHOP_ID}legacyoauth` — exactly as steps 3.2/3.3 had you name them:
+
 ```bash
 make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID
 ```
 
-This discovers your two harness ARNs (via `agentcore status`), your Cognito pool/client, and assumes your Phase 3
-resources are named `crexi${WORKSHOP_ID}legacyoauth` — exactly as steps 3.2/3.3 had you name them. Open
-`backend/.env` and confirm all seven values are non-empty before continuing.
+Open `backend/.env` and confirm all seven values are non-empty before continuing — a blank value here means one of
+the earlier phases used a different name than this command expects.
+
+Now start the app itself (FastAPI backend on `:8000`, Vite frontend on `:5173`):
 
 ```bash
 make dev
@@ -688,6 +738,10 @@ Open **http://localhost:5173**. Log in as `dana` (investor) or `marcus` (broker)
 ---
 
 ## Verification Checklist
+
+The `<placeholders>` below (`<a listing>`, `<a number>`, `<two properties>`) aren't values from an earlier step —
+pick any real listing name/price you see once the app is running and substitute it yourself when you type the
+prompt into the chat UI.
 
 If any item below fails and you're not sure why, `agentcore invoke ... --verbose` streams every tool call and
 result the model makes for that turn — check the tool `name` in the first `contentBlockStart`. If it's
