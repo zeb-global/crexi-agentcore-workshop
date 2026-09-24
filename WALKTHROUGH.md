@@ -35,28 +35,30 @@ as Gateway targets. Keep this command handy; you'll pull these ARNs again in a m
 
 `agentcore/agentcore.json` (the project config every `agentcore add`/`agentcore deploy` command reads and writes)
 doesn't exist yet. `agentcore create` is what generates it — but it always creates a **new project subfolder**, it
-doesn't initialize in place. So: run it in a scratch directory, then move just the pieces you need into this repo.
+doesn't initialize in place. So: run it at your repo root, then move just the pieces you need up and drop the rest.
 
 ```bash
-mkdir -p /tmp/agentcore-init && cd /tmp/agentcore-init
-agentcore create --project-name crexiWorkshopV2 --no-agent --skip-git --skip-install --output-dir .
+agentcore create --project-name crexiWorkshopV2 --no-agent --skip-git --skip-install
+mv crexiWorkshopV2/agentcore .
+rm -rf crexiWorkshopV2
 ```
 
 `--no-agent` matters — without it, this also scaffolds an unrelated runtime-agent code skeleton
-(`app/crexiWorkshopV2/main.py`) you don't want. This creates `/tmp/agentcore-init/crexiWorkshopV2/agentcore/` —
-config JSON plus a generated CDK project (`agentcore deploy`'s own deployment mechanism, not something you
-hand-write). Move just that into your repo:
+(`app/crexiWorkshopV2/main.py`) you don't want. This creates `crexiWorkshopV2/agentcore/` — config JSON plus a
+generated CDK project (`agentcore deploy`'s own deployment mechanism, not something you hand-write) — which the
+commands above move into place as `./agentcore` and discard the now-empty `crexiWorkshopV2/` wrapper.
+
+Now that `agentcore/aws-targets.json` exists, register your `WORKSHOP_ID` as a deployment target (idempotent — safe to
+re-run):
 
 ```bash
-cd - # back to your repo root
-cp -r /tmp/agentcore-init/crexiWorkshopV2/agentcore ./agentcore
-rm -rf /tmp/agentcore-init
+WORKSHOP_ID=$WORKSHOP_ID scripts/ensure-aws-target.sh
 ```
 
 Install its CDK project's own dependencies (skipped above with `--skip-install`):
 
 ```bash
-cd agentcore/cdk && npm install && cd -
+cd agentcore/cdk && npm install && cd ../..
 ```
 
 Confirm you now have a real, empty project:
@@ -181,6 +183,11 @@ Copy the ARN for `gw-readonly-${WORKSHOP_ID}` — you need it in the next step.
 
 ### 1.5 — Create the investor harness
 
+`--gateway-arn` needs the **full ARN** printed by 1.4's `identifier` field (e.g.
+`arn:aws:bedrock-agentcore:us-west-2:<account>:gateway/gw-readonly-kvj07-vzgzhckqbe`) — not the gateway's bare
+name/id. Passing the bare name passes CLI validation but fails later, at CDK deploy time, with a
+`does not match pattern ^arn:aws...` error.
+
 ```bash
 agentcore add harness --name investorAgent_${WORKSHOP_ID} \
   --model-provider bedrock --model-id us.anthropic.claude-sonnet-4-6 \
@@ -191,8 +198,26 @@ agentcore add harness --name investorAgent_${WORKSHOP_ID} \
   --allowed-tools "@market-data/*,@code-interpreter"
 ```
 
-This creates `app/investorAgent_${WORKSHOP_ID}/harness.json` with a placeholder system prompt. Replace it with the
-real one:
+This creates `app/investorAgent_${WORKSHOP_ID}/harness.json` — but check one thing before moving on: `--allowed-tools`
+references tools **by the harness tool's own `name` field**, not by the Gateway target's name. `agentcore add harness`
+defaults the gateway tool's `name` to the generic `"gateway"`, which `@market-data/*` in `--allowed-tools` won't
+match — the Gateway's sub-tools (`search_listings`, etc.) then silently never reach the model, and it falls back to
+fabricating data with `code_interpreter` instead of calling any real tool. Open `harness.json` and rename that tool
+entry's `"name"` from `"gateway"` to `"market-data"` so it lines up with `allowedTools`:
+
+```bash
+python3 -c "
+import json
+p = 'app/investorAgent_${WORKSHOP_ID}/harness.json'
+d = json.load(open(p))
+for t in d['tools']:
+    if t['type'] == 'agentcore_gateway':
+        t['name'] = 'market-data'
+json.dump(d, open(p, 'w'), indent=2)
+"
+```
+
+Now replace the placeholder system prompt with the real one:
 
 ```bash
 cat > app/investorAgent_${WORKSHOP_ID}/system-prompt.md <<'EOF'
@@ -419,6 +444,21 @@ targets. This is structural to AgentCore, not a design choice available to skip.
 Also update `allowedTools` in the same file to `["*"]` if it isn't already (the CLI should have set this from
 `--allowed-tools "*"` above — confirm it).
 
+Confirm all five tools actually landed before moving on — it's easy for a pasted JSON block to silently not make it
+into the array:
+
+```bash
+python3 -c "
+import json
+tools = json.load(open('app/brokerAgent_${WORKSHOP_ID}/harness.json'))['tools']
+print([t['name'] for t in tools])
+"
+```
+
+You should see `['gateway', 'browser', 'market-data', 'confirm_listing_change', 'get_legacy_credentials']` (the
+first name may differ if you renamed it). If `market-data` is missing, the broker will have no way to search or
+browse listings at all — it'll say so honestly rather than invent any, but the fix is just adding the block above.
+
 Now write the real system prompt. Get your legacy desk URL first:
 
 ```bash
@@ -586,7 +626,8 @@ aws bedrock-agentcore-control update-workload-identity --name "$WORKLOAD_NAME" \
 ### 3.3 — Create the OAuth2 credential provider
 
 ```bash
-PROVIDER_NAME="crexi${WORKSHOP_ID}legacyoauth"   # same name as the workload identity, by convention
+# Same name as the workload identity, by convention
+PROVIDER_NAME="crexi${WORKSHOP_ID}legacyoauth"
 
 PROVIDER_CONFIG=$(python3 -c "
 import json
@@ -648,6 +689,11 @@ Open **http://localhost:5173**. Log in as `dana` (investor) or `marcus` (broker)
 
 ## Verification Checklist
 
+If any item below fails and you're not sure why, `agentcore invoke ... --verbose` streams every tool call and
+result the model makes for that turn — check the tool `name` in the first `contentBlockStart`. If it's
+`code_interpreter` when you expected a Gateway tool, the model never saw the real tool (see Troubleshooting below);
+if it's honest about not having a tool rather than inventing data, that's also a config gap, not a prompt problem.
+
 - [ ] **Investor**: "What multi-family listings are available in Columbus?" returns real listings.
 - [ ] **Investor**: "Run underwriting on `<two properties>`, minimum cap rate 6.5%." goes through a visible Code
       Interpreter tool call, not just the model typing numbers.
@@ -679,9 +725,12 @@ price-change approvals), so the real bearer token never lands in an access log o
 | `agentcore create` also generated `app/crexiWorkshopV2/main.py` | You forgot `--no-agent`. Delete that stray directory (it's an unrelated runtime-agent skeleton, not a harness) and re-run Phase 0 with the flag. |
 | `Invalid harness configuration: ... config file not found` | Your harness's `name` in `agentcore.json` doesn't match its directory under `app/`. `agentcore add harness` should keep these in sync automatically — if you hand-edited `harness.json`'s `name` afterward, the directory won't have been renamed to match. |
 | `update-oauth2-credential-provider`/`create-oauth2-credential-provider` complains about a missing vendor | `--credential-provider-vendor "CognitoOauth2"` is required and easy to drop when copy-pasting partial commands — check it's present. |
+| `create-oauth2-credential-provider` fails with `Invalid length for parameter name, value: 0` (often preceded by `zsh: command not found: #`) | A variable assignment followed by a same-line `# comment` was pasted into zsh, which doesn't treat `#` as a comment in interactive mode by default — the assignment silently doesn't stick, so the next command runs with an empty variable. Re-set the variable (e.g. `export PROVIDER_NAME=crexi${WORKSHOP_ID}legacyoauth`) and re-run. |
 | Broker's legacy-desk step returns "Invalid or expired access token" | Your `LegacyDeskUrl` (patched into `system-prompt.md` in step 2.3) or your `LEGACY_OAUTH_*` names in `backend/.env` don't match what you actually created in Phase 3 — re-check both against the exact `WORKSHOP_ID`-suffixed names used above. |
 | `infra/.venv`/`backend/.venv` exists but `pip install` fails inside it | The venv is present but broken (e.g. left over from a system Python upgrade). `rm -rf infra/.venv backend/.venv` and re-run `make bootstrap`/`make wire-backend-env` — `scripts/vendor-deps.sh` recreates them cleanly. |
 | A harness call fails with `Unknown tool: <name>` after adding a custom tool | `allowedTools` needs an `@`-prefixed reference for anything that isn't one of AWS's fixed built-ins (e.g. `@market-data/*`, `@code-interpreter`) — a bare name only matches built-in tool identifiers. |
+| `agentcore deploy` fails with `Property value [...] does not match pattern ^arn:aws...` on a harness's `GatewayArn` | You passed the gateway's bare name/id to `--gateway-arn` in `agentcore add harness` instead of the full ARN from 1.4's `identifier` field. Since deploy failed before AWS created anything, remove the bad harness from local config and re-add it: `agentcore remove harness --name investorAgent_${WORKSHOP_ID} --yes`, then re-run `agentcore add harness` with the correct full ARN and redeploy. |
+| The harness deploys and responds, but invents listings instead of calling `search_listings` (or says outright it has no data-search tool) | Its gateway tool's `name` in `harness.json` doesn't match the `@`-prefixed reference in `allowedTools` (defaults to `"gateway"`, but `allowedTools` says `@market-data/*`) — the Gateway's sub-tools never reach the model. Rename the tool entry's `"name"` to `"market-data"` per step 1.5 and redeploy. Confirm with `agentcore invoke ... --verbose` that the trace shows a `market-data___search_listings` (or `x_amz_bedrock_agentcore_search`) call, not just `code_interpreter`. |
 | `make dev` says `backend/.env not found` | Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` — Phase 4, above. Nothing writes this file automatically on this branch. |
 
 If you get well and truly stuck, the `reference` branch has a fully working, automated version of everything

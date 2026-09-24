@@ -35,7 +35,6 @@ bootstrap: vendor-deps
 		CDK_DEFAULT_ACCOUNT=$$(aws sts get-caller-identity --query Account --output text) \
 		CDK_DEFAULT_REGION=$(AWS_REGION) \
 		cdk deploy --all --require-approval never
-	WORKSHOP_ID=$(WORKSHOP_ID) bash scripts/ensure-aws-target.sh
 	@echo ""
 	@echo "Base infrastructure deployed. Next: open WALKTHROUGH.md and build your"
 	@echo "gateways, harnesses, and Legacy Portal OAuth setup by hand."
