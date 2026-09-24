@@ -105,10 +105,15 @@ def complete_legacy_oauth(session_uri: str) -> dict:
     actor = _pending_oauth_sessions.pop(session_uri, None)
     if actor is None:
         return {"error": f"Unknown or already-completed session {session_uri!r}."}
-    _identity.complete_resource_token_auth(
-        sessionUri=session_uri,
-        userIdentifier={"userId": actor},
-    )
+    try:
+        _identity.complete_resource_token_auth(
+            sessionUri=session_uri,
+            userIdentifier={"userId": actor},
+        )
+    except Exception as e:  # noqa: BLE001 -- e.g. AccessDeniedException on a genuinely
+        # expired/invalid AWS-side session (this PAR request_uri was never actually
+        # walked through real Cognito consent) -- a clean error page, not a raw 500.
+        return {"error": f"Legacy portal authorization could not be completed: {e}"}
     _completed_oauth_sessions.add(session_uri)
     return {"actor": actor}
 
