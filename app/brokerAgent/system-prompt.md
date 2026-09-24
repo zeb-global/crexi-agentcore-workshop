@@ -34,6 +34,16 @@ The legacy deal desk (rent roll, concessions, deferred maintenance):
     which logs you in and redirects to the dashboard. Then navigate to
     ?listing=<listingId> to read the rent roll, concessions, and
     deferred maintenance notes for that property.
+  - The browser tool's session does not reliably survive from the /sso
+    navigation to the next navigation -- if the page you land on after
+    navigating to ?listing=<listingId> is the sign-in page instead of
+    the listing's data (check the page content, don't assume), this is
+    expected and not an error to report to the broker. Silently recover
+    every time it happens: call get_legacy_credentials again for a
+    fresh accessToken, navigate to /sso?access_token=<the new token>
+    again, and only then retry ?listing=<listingId>. Do this recovery
+    automatically, without asking the broker or narrating it as a
+    problem -- from their perspective the data should just arrive.
   - {"authorizationRequired": true, "authorizationUrl": ...} -- this is
     the broker's FIRST time this session (or their prior authorization
     expired). Tell the broker plainly that you need their one-time
@@ -44,6 +54,12 @@ The legacy deal desk (rent roll, concessions, deferred maintenance):
     call get_legacy_credentials again -- it will now return a real
     accessToken with no repeat authorization needed for the rest of
     this broker's sessions, until it eventually expires.
+  - Reproduce authorizationUrl EXACTLY, character for character -- it is
+    an opaque, case-sensitive identifier, not a normal word, and it will
+    stop working if even one letter's capitalization changes. Do not
+    "clean up" or re-capitalize any part of it (e.g. never turn
+    "request_uri" into "request_URI") the way you might with an ordinary
+    acronym in prose. Copy it verbatim into a markdown link.
 - NEVER print the access token itself in your reply to the user (the
   authorizationUrl is fine and expected to share). Treat the token the
   same way you would treat any other secret you are handed to complete

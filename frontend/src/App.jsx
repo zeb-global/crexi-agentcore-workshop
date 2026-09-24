@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { login, sendMessage, resumeInterrupt, stopRun, fetchListings } from "./api";
+import { login, sendMessage, resumeInterrupt, stopRun, fetchListings, checkLegacyOAuthStatus } from "./api";
 import LoginScreen from "./components/LoginScreen";
 import ListingsGrid from "./components/ListingsGrid";
 import ComparisonTable from "./components/ComparisonTable";
@@ -50,6 +50,21 @@ function comparisonToListings(comparison) {
   }));
 }
 
+// Pulls the opaque request_uri (== AgentCore Identity's sessionUri) out of
+// a Legacy Portal OAuth authorizationUrl embedded in the assistant's chat
+// text, so the frontend can poll for its completion. Returns null when
+// the text has no such link.
+function extractPendingOAuthSessionUri(text) {
+  if (!text) return null;
+  const match = text.match(/https:\/\/[^\s)]*bedrock-agentcore[^\s)]*[?&]request_uri=([^\s)&]+)/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [session, setSession] = useState(null); // {accessToken, username, group}
   const [loginError, setLoginError] = useState(null);
@@ -92,6 +107,7 @@ export default function App() {
   const abortRef = useRef(null);
   const textareaRef = useRef(null);
   const scrollRef = useRef(null);
+  const oauthPollRef = useRef(null); // {sessionUri, intervalId, timeoutId}
 
   const totalUsd = costEvents.reduce((sum, c) => sum + c.costUsd, 0);
 
@@ -266,6 +282,7 @@ export default function App() {
   }, []);
 
   function handleLogout() {
+    clearOAuthPoll();
     setSession(null);
     setTurns([]);
     setCostEvents([]);
@@ -299,10 +316,7 @@ export default function App() {
     }
   }
 
-  async function handleSend() {
-    if (!input.trim() || running) return;
-    const text = input.trim();
-    setInput("");
+  async function sendTurn(text) {
     setTurns((prev) => [...prev, emptyTurn(text)]);
     setRunning(true);
     runIdRef.current = newId();
@@ -323,12 +337,60 @@ export default function App() {
     }
   }
 
+  async function handleSend() {
+    if (!input.trim() || running) return;
+    const text = input.trim();
+    setInput("");
+    await sendTurn(text);
+  }
+
   function handleComposerKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   }
+
+  function clearOAuthPoll() {
+    if (oauthPollRef.current) {
+      clearInterval(oauthPollRef.current.intervalId);
+      clearTimeout(oauthPollRef.current.timeoutId);
+      oauthPollRef.current = null;
+    }
+  }
+
+  // Watches the latest assistant message for an outstanding Legacy Portal
+  // OAuth authorization link and polls /oauth/legacy-status until the
+  // broker finishes granting consent in the new tab it opened in, then
+  // auto-sends a continuation turn -- so the chat picks back up on its
+  // own instead of requiring the broker to come back and type something
+  // first. Gives up after 8 minutes (comfortably under the PAR request's
+  // own ~10 minute server-side TTL) and falls back to the system prompt's
+  // own "let me know" instruction.
+  useEffect(() => {
+    if (running) return;
+    const lastTurn = turns[turns.length - 1];
+    const sessionUri = extractPendingOAuthSessionUri(lastTurn?.assistantText);
+    if (!sessionUri || oauthPollRef.current?.sessionUri === sessionUri) return;
+
+    clearOAuthPoll();
+    const intervalId = setInterval(async () => {
+      try {
+        const { completed } = await checkLegacyOAuthStatus(sessionUri);
+        if (completed) {
+          clearOAuthPoll();
+          sendTurn("I've completed the authorization -- please continue.");
+        }
+      } catch {
+        // Transient network hiccup -- next tick retries.
+      }
+    }, 2000);
+    const timeoutId = setTimeout(clearOAuthPoll, 8 * 60 * 1000);
+    oauthPollRef.current = { sessionUri, intervalId, timeoutId };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turns, running]);
+
+  useEffect(() => clearOAuthPoll, []);
 
   async function handleInterruptAnswer(approved) {
     const interrupt = pendingInterrupt;
@@ -434,7 +496,16 @@ export default function App() {
                     <ToolSteps toolCalls={t.toolCalls} />
                     {t.assistantText && (
                       <div className="assistant-text">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.assistantText}</ReactMarkdown>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            a: ({ node, ...props }) => (
+                              <a {...props} target="_blank" rel="noopener noreferrer" />
+                            ),
+                          }}
+                        >
+                          {t.assistantText}
+                        </ReactMarkdown>
                         {t.status === "streaming" && <span className="stream-cursor" />}
                       </div>
                     )}

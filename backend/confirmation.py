@@ -53,6 +53,16 @@ _identity = boto3.client("bedrock-agentcore", region_name=config.AWS_REGION)
 # than silently relied on.
 _pending_oauth_sessions: dict[str, str] = {}
 
+# Session URIs whose authorization has completed -- lets the frontend poll
+# /oauth/legacy-status and auto-resume the chat turn once the broker
+# finishes in the new tab, instead of requiring them to come back and
+# type something before the agent will retry.
+_completed_oauth_sessions: set[str] = set()
+
+
+def is_oauth_session_complete(session_uri: str) -> bool:
+    return session_uri in _completed_oauth_sessions
+
 
 def resolve_legacy_credentials(actor: str) -> dict:
     """actor: the real signed-in username (e.g. 'marcus'), from a
@@ -99,6 +109,7 @@ def complete_legacy_oauth(session_uri: str) -> dict:
         sessionUri=session_uri,
         userIdentifier={"userId": actor},
     )
+    _completed_oauth_sessions.add(session_uri)
     return {"actor": actor}
 
 

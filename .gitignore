@@ -15,6 +15,7 @@ services/mcp_market_data/pypdf-*.dist-info/
 services/mcp_market_data/bin/
 services/mcp_market_data/.lock
 
+services/legacy_deal_desk/certifi/
 services/legacy_deal_desk/jose/
 services/legacy_deal_desk/ecdsa/
 services/legacy_deal_desk/rsa/

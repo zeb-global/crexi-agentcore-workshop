@@ -70,6 +70,15 @@ export async function streamAgui(accessToken, payload, onEvent, opts = {}) {
   }
 }
 
+// Polled while a Legacy Portal OAuth authorization link is outstanding
+// (see App.jsx) so the chat can auto-resume once the broker finishes in
+// the new tab, instead of them having to come back and type something.
+export async function checkLegacyOAuthStatus(sessionUri) {
+  const res = await fetch(`${API_BASE}/oauth/legacy-status?session_uri=${encodeURIComponent(sessionUri)}`);
+  if (!res.ok) return { completed: false };
+  return res.json();
+}
+
 export function sendMessage(accessToken, { threadId, runId, text }, onEvent, opts) {
   return streamAgui(
     accessToken,

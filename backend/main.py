@@ -372,9 +372,20 @@ async def legacy_oauth_callback(request: Request):
     if "error" in result:
         return HTMLResponse(f"<p>{result['error']}</p>", status_code=400)
     return HTMLResponse(
-        "<p>Authorization complete. You can close this tab and return to the chat "
-        "-- ask the agent to try again.</p>"
+        "<p>Authorization complete. You can close this tab and return to the chat.</p>"
     )
+
+
+@app.get("/oauth/legacy-status")
+async def legacy_oauth_status(session_uri: str):
+    """Polled by the frontend while a Legacy Portal OAuth authorization
+    link is outstanding, so the chat can auto-resume the moment the
+    broker finishes in the new tab instead of requiring them to come
+    back and type something first. Same no-auth-header situation as
+    /oauth/legacy-callback above -- session_uri is an opaque, single-use
+    PAR identifier the client already holds, not a secret to protect
+    further."""
+    return {"completed": confirmation.is_oauth_session_complete(session_uri)}
 
 
 @app.get("/health")
