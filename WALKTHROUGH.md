@@ -349,12 +349,12 @@ Open **http://localhost:5173**. Log in as `dana` (investor) or `marcus` (broker)
 ## Verification Checklist
 
 - [ ] **Investor**: "What multi-family listings are available in Columbus?" returns real listings.
-- [ ] **Investor**: "Run underwriting on <two properties>, minimum cap rate 6.5%." goes through a visible Code
+- [ ] **Investor**: "Run underwriting on `<two properties>`, minimum cap rate 6.5%." goes through a visible Code
       Interpreter tool call, not just the model typing numbers.
 - [ ] **Broker**: "What listings do I have?" returns only `marcus`'s own listings.
-- [ ] **Broker**: "Change the asking price on <a listing> to <a number>." pauses for your explicit confirmation
+- [ ] **Broker**: "Change the asking price on `<a listing>` to `<a number>`." pauses for your explicit confirmation
       before writing anything.
-- [ ] **Broker**: "Check the rent roll for <a listing> on the legacy deal desk." — first time, returns an
+- [ ] **Broker**: "Check the rent roll for `<a listing>` on the legacy deal desk." — first time, returns an
       authorization link; open it, sign in, grant consent, and the chat resumes on its own within a few seconds
       and returns real rent-roll/concessions/deferred-maintenance data.
 

@@ -67,6 +67,34 @@ below for how that's enforced.
 
 Run `make preflight` any time to check all of the above at once (it also validates your chosen `WORKSHOP_ID`).
 
+### Adding your AWS credentials
+
+If you were handed **temporary/session credentials** (an access key, secret key, and session token — the common
+case for a shared workshop account), export all three in the same terminal you'll run `make` from:
+
+```bash
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_SESSION_TOKEN=...
+```
+
+These are only set for that terminal session — open a new tab/window and you'll need to re-export them there too.
+They also expire (sometimes in as little as an hour); if a command suddenly fails with `ExpiredToken` or
+`security token included in the request is expired`, get fresh credentials and re-export, then just re-run
+whatever step failed — everything in this workshop is safe to retry.
+
+If you were handed a **long-lived access key pair** instead (no session token), either export just the first two
+lines above, or run `aws configure` once to store them in `~/.aws/credentials` so you don't need to re-export them
+every session.
+
+Either way, confirm they're active before continuing:
+
+```bash
+aws sts get-caller-identity
+```
+
+This should print your account ID and an ARN, not an error.
+
 ## Quickstart
 
 Pick a `WORKSHOP_ID` — a short, lowercase-friendly, **letters-and-digits-only, must start with a letter** name
@@ -108,11 +136,11 @@ for username in ('dana', 'marcus'):
 ### Things to try
 
 - **As dana (investor):** "What multi-family listings are available in Columbus?", then "Run underwriting on
-  <two of the properties it lists>, minimum cap rate 6.5%." Watch the tool-activity panel — underwriting should go
+  `<two of the properties it lists>`, minimum cap rate 6.5%." Watch the tool-activity panel — underwriting should go
   through a real Code Interpreter execution, not the model just typing numbers.
-- **As marcus (broker):** "What listings do I have?", then "Change the asking price on <one of them> to
-  <a new number>." — this pauses for your explicit confirmation before writing anything. Also try: "Check the rent
-  roll for <a listing> on the legacy deal desk" — this drives a real browser session through a separate login-gated
+- **As marcus (broker):** "What listings do I have?", then "Change the asking price on `<one of them>` to
+  `<a new number>`." — this pauses for your explicit confirmation before writing anything. Also try: "Check the rent
+  roll for `<a listing>` on the legacy deal desk" — this drives a real browser session through a separate login-gated
   app with no API.
 
 ### Resetting data
