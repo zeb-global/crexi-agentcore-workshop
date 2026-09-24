@@ -1,5 +1,11 @@
 # CREXi AgentCore Workshop
 
+**This is the workshop branch.** `make bootstrap` here only deploys the CDK baseline (data, identity, legacy
+desk, tool Lambdas, observability) — every AgentCore-native piece (Gateways, harnesses, and the Legacy Portal
+OAuth workload identity/credential provider) you build **by hand**, following **[WALKTHROUGH.md](WALKTHROUGH.md)**.
+That hands-on work is the actual point of the workshop. If you'd rather see a fully automated one-command deploy
+end to end for reference, that's the `reference` branch — not this one.
+
 A live, working reference implementation of two AI assistants for commercial real estate, built on **Amazon
 Bedrock AgentCore**:
 
@@ -75,16 +81,14 @@ export AWS_REGION=us-west-2   # or your region
 
 make preflight
 make bootstrap WORKSHOP_ID=$WORKSHOP_ID WORKSHOP_SECRET=$WORKSHOP_SECRET
-make dev
 ```
 
-`make bootstrap` is the whole deploy, start to finish, in one command — on first run it also provisions
-`infra/.venv`, `backend/.venv`, `agentcore/cdk/node_modules`, and `frontend/node_modules` before deploying 5 CDK
-stacks (data, identity, legacy desk, tool Lambdas, observability), then the AgentCore harnesses and Gateways in
-two passes (see below for why), then the Legacy Portal OAuth workload identity and credential provider (see
-[Legacy Portal OAuth](#legacy-portal-oauth)), then writes `backend/.env`. Nothing else needs to run before
-`make dev`. `make dev` starts the FastAPI backend on `:8000` and the Vite frontend on `:5173`; open
-**http://localhost:5173**.
+On first run, `make bootstrap` also provisions `infra/.venv`, `backend/.venv`, `agentcore/cdk/node_modules`, and
+`frontend/node_modules`, then deploys 5 CDK stacks (data, identity, legacy desk, tool Lambdas, observability) —
+**and stops there.** Everything after this is manual: open **[WALKTHROUGH.md](WALKTHROUGH.md)** and work through
+building the investor harness, the broker harness, and the Legacy Portal OAuth setup by hand. Only once the
+walkthrough has you run `make wire-backend-env` does `make dev` (FastAPI backend on `:8000`, Vite frontend on
+`:5173`, open **http://localhost:5173**) become meaningful.
 
 ### Logging in
 
@@ -141,57 +145,52 @@ by directly inspecting the synthesized CloudFormation template and the CLI's own
 
 1. **`agentcore deploy --target <id>`** gives each participant an independently tracked CloudFormation stack
    (`AgentCore-crexiWorkshopV2-<id>`) — but every *physical name* inside that stack (Gateway Name, Harness Name, and
-   the harness's own IAM Role name) is a literal string taken straight from `agentcore.json`, **not** namespaced by
-   the target. Two participants both deploying a harness literally named `investorAgent` collide on the same IAM
-   Role even in separate stacks. So [`scripts/render_agentcore_config.py`](scripts/render_agentcore_config.py)
-   suffixes every one of those names with your `WORKSHOP_ID` before every deploy.
+   the harness's own IAM Role name) is a literal string, **not** namespaced by the target automatically. Two
+   participants both naming a harness literally `investorAgent` would collide on the same IAM Role even in separate
+   stacks — **this is why WALKTHROUGH.md has you suffix every resource name you create by hand with your own
+   `WORKSHOP_ID`** (e.g. `investorAgent_jsmith01`), not just accept a tool's default suggestion.
 
 2. A harness's Gateway reference (`tools[].config.agentCoreGateway.gatewayArn`) is a **resolved literal ARN**, not
-   an in-stack CDK reference — and AWS only assigns that ARN once the Gateway actually exists. So `make bootstrap`
-   deploys in two passes: your uniquely-named Gateways first, then reads their real ARNs back and deploys your
-   uniquely-named harnesses referencing them.
+   an in-stack CDK reference — and AWS only assigns that ARN once the Gateway actually exists. This is why
+   WALKTHROUGH.md has you create your Gateways *before* the harness that references them, not the other way round.
 
 3. `agentcore validate` derives a harness's config directory from its registry `name` as `app/<name>/harness.json`
-   — not the schema's own separate `path` field. So a per-participant harness needs its own directory; the render
-   script generates `app/investorAgent_<id>/` and `app/brokerAgent_<id>/` by copying the canonical
-   `app/investorAgent/` and `app/brokerAgent/` sources and patching the copy. **Edit the canonical
-   `app/investorAgent/system-prompt.md` and `harness.json`** (or `app/brokerAgent/...`) to change agent behavior for
-   everyone — the generated `_<id>` directories are gitignored, regenerated on every deploy, and should never be
-   hand-edited.
+   — not the schema's own separate `path` field, so each harness you create by hand needs its own directory
+   matching its name. WALKTHROUGH.md's steps handle this as part of `agentcore add harness`/the atomic CLI
+   commands.
 
-4. `app/brokerAgent/system-prompt.md` names the legacy deal desk's Lambda Function URL as literal text (for the
-   model to navigate the Browser tool to). That URL is unique per participant too (`LegacyStack`'s
-   `LegacyDeskUrl` output) — the render script patches it into the generated `system-prompt.md` the same way.
+4. `app/brokerAgent/system-prompt.md` (or your own per-participant copy of it) names the legacy deal desk's Lambda
+   Function URL as literal text, for the model to navigate the Browser tool to. That URL is unique per participant
+   (`LegacyStack`'s `LegacyDeskUrl` output) — WALKTHROUGH.md has you paste your own into the prompt.
 
 If you ever see a broker harness fail to log into the legacy desk, or an investor harness returning another
-participant's listings, one of these four is the first thing to check — it almost certainly means `agentcore.json`
-was last rendered/deployed for a *different* `WORKSHOP_ID` than the one you're currently testing.
+participant's listings, one of these four is the first thing to check — it almost certainly means a resource name
+or URL was copied from someone else's example instead of your own `WORKSHOP_ID`'s values.
 
 ### `make deploy` vs `make bootstrap`
 
-`make bootstrap` is the full first-time path (CDK + two-phase AgentCore deploy + backend wiring, all in one
-command). If you only change a `system-prompt.md` or `harness.json` afterward, you don't need to repeat all of
-that — `make deploy WORKSHOP_ID=$WORKSHOP_ID` re-renders and redeploys just the harness layer, reusing your
-already-deployed Gateways. Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` afterward too if that harness
-change touched a harness ARN.
+`make bootstrap` only does the CDK baseline. `make deploy WORKSHOP_ID=$WORKSHOP_ID` is a plain passthrough to
+`agentcore deploy` for whatever you've built by hand so far — use it after any harness/gateway change per
+WALKTHROUGH.md. Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` afterward too if that change touched a
+harness ARN.
 
 ### Backend wiring
 
 `backend/config.py` reads harness ARNs, the Cognito pool/client ID, table names, and the Legacy Portal OAuth
 identity/provider names from environment variables, falling back to a fixed set of `dev01` values that only exist
-so the module imports cleanly — **they are not a valid target for anyone else to run against.** `make bootstrap`
-already runs [`scripts/wire-backend-env.sh`](scripts/wire-backend-env.sh) for you as its last step, writing a real
-`backend/.env`; you only need to run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` by hand again if you later
-redeploy just the harness layer with `make deploy` and it changed a harness ARN.
+so the module imports cleanly — **they are not a valid target for anyone else to run against.** Run
+`make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` yourself once you've built the harnesses and the OAuth resources
+per WALKTHROUGH.md — it writes a real `backend/.env` by discovering your harness ARNs (via `agentcore status`) and
+assuming your OAuth workload identity/credential provider are named `crexi<WORKSHOP_ID>legacyoauth`, exactly as
+the walkthrough has you name them.
 
 ### Legacy Portal OAuth
 
 Checkpoint 4's broker agent authorizes access to the legacy deal desk through a real per-user OAuth flow via
-AgentCore Identity's Token Vault, not a stored password. `make bootstrap`'s last step
-([`scripts/setup-legacy-oauth.sh`](scripts/setup-legacy-oauth.sh), called from `wire-backend-env.sh`) creates (or
-reuses) the two AgentCore Identity resources this needs — a workload identity and an OAuth2 credential provider
-pointing at the `LegacyOAuthAppClient` Cognito app client from `identity_stack.py` — and wires their callback URLs
-together. This is fully automated on this branch; nothing to do by hand.
+AgentCore Identity's Token Vault, not a stored password. On this branch, you create the two AgentCore Identity
+resources this needs — a workload identity and an OAuth2 credential provider pointing at the `LegacyOAuthAppClient`
+Cognito app client from `identity_stack.py` — by hand, via WALKTHROUGH.md's Phase 3. That hands-on AgentCore
+Identity work is a deliberate teaching moment, not an oversight.
 
 The first time you actually chat as marcus and ask about a listing's rent roll, `get_legacy_credentials` will
 return an authorization URL instead of a token — open it in your own browser (not the one AgentCore Browser
@@ -225,9 +224,9 @@ deliberate simplification called out there and in Known Limitations below.
 | `effective region is 'X', not us-west-2` | `AWS_REGION`/`AWS_DEFAULT_REGION` in your shell is overriding an otherwise-correctly-configured AWS CLI profile. |
 | `CDK not bootstrapped` | Run `cdk bootstrap` once for your account/region. |
 | `agentcore --version` prints nothing useful | An old `pip install bedrock-agentcore-starter-toolkit` is shadowing the real npm `agentcore` CLI on `PATH`. |
-| `Invalid harness configuration: ... config file not found` | `agentcore.json`'s harness `path` doesn't match a real directory — almost always means `agentcore.json` needs re-rendering for your `WORKSHOP_ID` (`python3 scripts/render_agentcore_config.py $WORKSHOP_ID harnesses`) before the next `agentcore deploy`. |
-| Broker's legacy-desk `/sso` login fails ("Invalid or expired access token") | `agentcore.json`/the generated `system-prompt.md` was last rendered for a different `WORKSHOP_ID` — the legacy desk URL patched into the broker's system prompt points at a different participant's deployment, whose OAuth pool doesn't recognize your token. Re-render and redeploy for yours. |
-| `make dev` says `backend/.env not found` | `make bootstrap` writes this as its last step — if it's missing, either bootstrap didn't complete, or you redeployed just the harness layer with `make deploy` afterward. Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID`. |
+| `Invalid harness configuration: ... config file not found` | `agentcore.json`'s harness `path` doesn't match a real directory — check the harness's `name`/`path` against WALKTHROUGH.md's naming convention before the next `agentcore deploy`. |
+| Broker's legacy-desk `/sso` login fails ("Invalid or expired access token") | The legacy desk URL pasted into the broker's system prompt points at a different participant's deployment (copied from an example instead of your own `LegacyStack`'s `LegacyDeskUrl` output), whose OAuth pool doesn't recognize your token. |
+| `make dev` says `backend/.env not found` | Run `make wire-backend-env WORKSHOP_ID=$WORKSHOP_ID` once you've built the harnesses and OAuth resources per WALKTHROUGH.md — nothing writes this file automatically on this branch. |
 | `sh: tsc: command not found` / `pip install` failures during `make bootstrap` | First-run setup: `make bootstrap` provisions `infra/.venv`, `backend/.venv`, `agentcore/cdk/node_modules`, and `frontend/node_modules` on its own the first time it runs (a few extra minutes) — no manual install needed. If it still fails, you likely have no network access to PyPI/npm (corporate proxy/firewall); fix that and re-run `make bootstrap`, which is safe to retry. |
 | `uvicorn`/Vite fails with `Address already in use` on `:8000` or `:5173` | A previous `make dev` (yours or a leftover process) is still holding the port — find it with `lsof -i :8000` and stop that specific process, then re-run `make dev`. Don't `pkill` by name; that can kill an unrelated process reusing the same command name. |
 | A harness call fails with `Unknown tool: <name>` after you added a custom tool | `harness.json`'s `allowedTools` needs an `@`-prefixed reference for any tool that isn't one of AWS's fixed built-ins (e.g. `@my-custom-tool`, matching how Gateway tools are already listed as `@market-data/*`) — a bare name in `allowedTools` only matches AWS's built-in tool identifiers and silently rejects everything else before it dispatches. |
@@ -236,15 +235,15 @@ deliberate simplification called out there and in Known Limitations below.
 
 ```
 crexiWorkshopV2/
-├── Makefile                    # preflight, bootstrap, deploy, seed, dev, destroy
+├── Makefile                    # preflight, bootstrap (CDK only), deploy, seed, dev, destroy
+├── WALKTHROUGH.md               # Everything AgentCore-native: build it here, by hand
 ├── agentcore/
-│   ├── agentcore.json          # Gateways, harness registry (rendered per-WORKSHOP_ID before each deploy)
+│   ├── agentcore.json          # You add your own Gateways/harnesses here, per WALKTHROUGH.md
 │   ├── aws-targets.json        # One entry per participant (added by scripts/ensure-aws-target.sh)
 │   └── .cli/deployed-state.json
 ├── app/
-│   ├── investorAgent/          # Canonical harness.json + system-prompt.md -- EDIT THESE
-│   └── brokerAgent/            # Canonical harness.json + system-prompt.md -- EDIT THESE
-│   # app/investorAgent_<id>/, app/brokerAgent_<id>/ are generated per-participant, gitignored
+│   ├── investorAgent/          # Starting point -- copy to your own investorAgent_<id>/, then edit
+│   └── brokerAgent/            # Starting point -- copy to your own brokerAgent_<id>/, then edit
 ├── infra/                      # CDK: Data, Identity, Legacy, Tools, Observability stacks
 ├── services/
 │   ├── mcp_market_data/        # Lambda: search_listings, get_listing, get_market_comps, documents
@@ -257,6 +256,5 @@ crexiWorkshopV2/
     ├── preflight.sh
     ├── vendor-deps.sh
     ├── ensure-aws-target.sh / remove-aws-target.sh
-    ├── render_agentcore_config.py   # The per-participant isolation fix -- see above
-    └── wire-backend-env.sh
+    └── wire-backend-env.sh      # Assumes you named things per WALKTHROUGH.md's convention
 ```

@@ -89,9 +89,10 @@ class LegacyStack(Stack):
         # for the model to navigate the Browser tool to -- it was hardcoded
         # to whichever workshop deployed first, so every other participant's
         # broker harness tried to log into THAT workshop's legacy desk with
-        # THEIR OWN credentials and failed. render_agentcore_config.py reads
-        # this output and patches the real per-participant URL into the
-        # generated system-prompt.md copy.
+        # THEIR OWN credentials and failed. Each participant's own copy of
+        # system-prompt.md needs this exact value patched in by hand (see
+        # WALKTHROUGH.md's Phase 2) or, on the reference branch,
+        # render_agentcore_config.py does it automatically.
         CfnOutput(self, "LegacyDeskUrl", value=self.fn_url.url)
 
         seed_fn = _lambda.Function(

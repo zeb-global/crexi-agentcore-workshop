@@ -31,14 +31,13 @@ USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK"
 APP_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name "$IDENTITY_STACK" \
   --query "Stacks[0].Outputs[?OutputKey=='AppClientId'].OutputValue" --output text)
 
-# Checkpoint 4 / Legacy Portal OAuth: creates (or reuses) the workload
-# identity + credential provider this reference deployment needs, and
-# wires the resulting Cognito/workload callback URLs together. See that
-# script's own header for why this lives here and not in `make bootstrap`.
+# Checkpoint 4 / Legacy Portal OAuth: on this branch, the workload identity
+# and credential provider are created BY HAND per WALKTHROUGH.md's Phase 3,
+# using this exact naming convention -- must match what you named them, or
+# backend/.env will point at resources that don't exist.
+LEGACY_OAUTH_WORKLOAD_NAME="crexi${WORKSHOP_ID}legacyoauth"
+LEGACY_OAUTH_PROVIDER_NAME="crexi${WORKSHOP_ID}legacyoauth"
 LEGACY_OAUTH_RETURN_URL="http://localhost:8000/oauth/legacy-callback"
-OAUTH_NAMES=$(bash scripts/setup-legacy-oauth.sh "$WORKSHOP_ID" "$LEGACY_OAUTH_RETURN_URL")
-LEGACY_OAUTH_WORKLOAD_NAME=$(echo "$OAUTH_NAMES" | grep LEGACY_OAUTH_WORKLOAD_NAME | cut -d= -f2)
-LEGACY_OAUTH_PROVIDER_NAME=$(echo "$OAUTH_NAMES" | grep LEGACY_OAUTH_PROVIDER_NAME | cut -d= -f2)
 
 cat > backend/.env <<EOF
 WORKSHOP_ID=${WORKSHOP_ID}

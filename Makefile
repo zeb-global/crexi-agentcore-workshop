@@ -20,29 +20,13 @@ preflight:
 vendor-deps:
 	@bash scripts/vendor-deps.sh
 
-# Full path: our CDK (data/identity/legacy/tools/observability), then the
-# AgentCore CLI's own deploy (gateways, targets, memory, harnesses).
-#
-# `agentcore deploy --target <id>` gives each participant an independently
-# tracked CloudFormation stack (AgentCore-crexiWorkshopV2-<id>) -- but every
-# physical name inside it (Gateway Name, Harness Name -> IAM Role name) is
-# still a literal string from agentcore.json, not namespaced by the target.
-# scripts/render_agentcore_config.py suffixes every one of those names with
-# WORKSHOP_ID before each deploy so participants never collide.
-#
-# It's a two-phase deploy on first bootstrap: a harness's gatewayArn is a
-# literal, resolved string (confirmed in the synthesized CFN template -- not
-# an in-stack CDK reference), and AWS only assigns that ARN once the gateway
-# actually exists. So: deploy this participant's (uniquely-named) gateways
-# alone first, then render the harnesses against the real ARNs and deploy
-# again to add them to the same stack.
-#
-# This is the REFERENCE branch's bootstrap -- one command, start to finish,
-# including wire-backend-env (harness ARNs + Cognito + the Legacy Portal
-# OAuth workload identity/credential provider, see scripts/setup-legacy-oauth.sh).
-# `make dev` needs nothing else run first. The participant workshop branch's
-# bootstrap stops after the CDK deploy on purpose -- see that branch's own
-# Makefile and the walkthrough for why.
+# This is the WORKSHOP branch's bootstrap -- CDK stacks only
+# (data/identity/legacy/tools/observability). It deliberately stops here:
+# everything AgentCore-native (gateways, harnesses, the Legacy Portal OAuth
+# workload identity/credential provider) is built by hand, per WALKTHROUGH.md
+# -- that hands-on work is the actual point of the workshop. Compare the
+# REFERENCE branch's Makefile, where this same target goes on to do all of
+# that automatically.
 bootstrap: vendor-deps
 	@test -n "$(WORKSHOP_ID)" || (echo "Usage: make bootstrap WORKSHOP_ID=<id> WORKSHOP_SECRET=<secret>"; exit 1)
 	@test -n "$(WORKSHOP_SECRET)" || (echo "WORKSHOP_SECRET is required"; exit 1)
@@ -52,20 +36,16 @@ bootstrap: vendor-deps
 		CDK_DEFAULT_REGION=$(AWS_REGION) \
 		cdk deploy --all --require-approval never
 	WORKSHOP_ID=$(WORKSHOP_ID) bash scripts/ensure-aws-target.sh
-	python3 scripts/render_agentcore_config.py $(WORKSHOP_ID) gateways
-	agentcore deploy --yes --target $(WORKSHOP_ID)
-	python3 scripts/render_agentcore_config.py $(WORKSHOP_ID) harnesses
-	agentcore deploy --yes --target $(WORKSHOP_ID)
-	bash scripts/wire-backend-env.sh $(WORKSHOP_ID)
+	@echo ""
+	@echo "Base infrastructure deployed. Next: open WALKTHROUGH.md and build your"
+	@echo "gateways, harnesses, and Legacy Portal OAuth setup by hand."
 
-# Redeploy just the harness/gateway layer (e.g. after a system-prompt or
-# harness.json edit) without a full cdk deploy. Re-renders against this
-# participant's already-deployed gateways (no gateways-only phase needed --
-# their ARNs are already known) and their current Lambda ARNs, in case the
-# Lambda was replaced since the last full bootstrap.
+# On the workshop branch this is a plain passthrough to the AgentCore CLI --
+# use it after any harness/gateway config change you make by hand, per
+# WALKTHROUGH.md. Nothing to render first; you already named everything
+# yourself when you created it.
 deploy:
 	@test -n "$(WORKSHOP_ID)" || (echo "Usage: make deploy WORKSHOP_ID=<id>"; exit 1)
-	python3 scripts/render_agentcore_config.py $(WORKSHOP_ID) harnesses
 	agentcore deploy --yes --target $(WORKSHOP_ID)
 
 # Re-seeds listings/comps/documents/legacy records to opening state without

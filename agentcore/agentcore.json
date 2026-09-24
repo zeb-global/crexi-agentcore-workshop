@@ -13,57 +13,11 @@
   "credentials": [],
   "evaluators": [],
   "onlineEvalConfigs": [],
-  "agentCoreGateways": [
-    {
-      "name": "gw-readonly-dev01",
-      "protocolType": "MCP",
-      "description": "Read-only market data: listings, comps, documents",
-      "targets": [
-        {
-          "name": "market-data",
-          "targetType": "lambdaFunctionArn",
-          "lambdaFunctionArn": {
-            "lambdaArn": "arn:aws:lambda:us-west-2:347272280436:function:crexi-dev01-mcp-market-data",
-            "toolSchemaFile": "agentcore/tool-schemas/market-data.json"
-          }
-        }
-      ],
-      "authorizerType": "AWS_IAM",
-      "enableSemanticSearch": true,
-      "exceptionLevel": "NONE"
-    },
-    {
-      "name": "gw-ops-dev01",
-      "protocolType": "MCP",
-      "description": "Listing write operations, approval-token gated",
-      "targets": [
-        {
-          "name": "listing-ops",
-          "targetType": "lambdaFunctionArn",
-          "lambdaFunctionArn": {
-            "lambdaArn": "arn:aws:lambda:us-west-2:347272280436:function:crexi-dev01-mcp-listing-ops",
-            "toolSchemaFile": "agentcore/tool-schemas/listing-ops.json"
-          }
-        }
-      ],
-      "authorizerType": "AWS_IAM",
-      "enableSemanticSearch": true,
-      "exceptionLevel": "NONE"
-    }
-  ],
+  "agentCoreGateways": [],
   "policyEngines": [],
   "configBundles": [],
   "abTests": [],
-  "harnesses": [
-    {
-      "name": "investorAgent_dev01",
-      "path": "app/investorAgent_dev01"
-    },
-    {
-      "name": "brokerAgent_dev01",
-      "path": "app/brokerAgent_dev01"
-    }
-  ],
+  "harnesses": [],
   "datasets": [],
   "capacityProviders": [],
   "payments": []
