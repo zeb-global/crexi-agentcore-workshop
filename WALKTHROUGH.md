@@ -155,7 +155,7 @@ MARKET_DATA_ARN=$(aws cloudformation describe-stacks --stack-name "Crexi${WORKSH
 
 agentcore add gateway-target --gateway gw-readonly-${WORKSHOP_ID} --name market-data \
   --type lambda-function-arn --lambda-arn "$MARKET_DATA_ARN" \
-  --tool-schema-file agentcore/tool-schemas/market-data.json --outbound-auth none
+  --tool-schema-file agentcore/tool-schemas/market-data.json
 ```
 
 ### 1.4 — Deploy the Gateway alone, first
@@ -346,7 +346,7 @@ LISTING_OPS_ARN=$(aws cloudformation describe-stacks --stack-name "Crexi${WORKSH
 
 agentcore add gateway-target --gateway gw-ops-${WORKSHOP_ID} --name listing-ops \
   --type lambda-function-arn --lambda-arn "$LISTING_OPS_ARN" \
-  --tool-schema-file agentcore/tool-schemas/listing-ops.json --outbound-auth none
+  --tool-schema-file agentcore/tool-schemas/listing-ops.json
 
 agentcore deploy --yes --target $WORKSHOP_ID
 ```
