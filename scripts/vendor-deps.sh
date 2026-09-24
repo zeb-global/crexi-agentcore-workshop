@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 # Sets up everything a fresh clone needs before `make bootstrap`'s own
-# cdk/agentcore deploy steps can run, and everything `make dev` needs
-# afterward. Confirmed this is genuinely missing by cloning fresh from
-# origin and running the documented flow end to end -- infra/.venv,
-# backend/.venv, frontend/node_modules, and agentcore/cdk/node_modules
-# are all referenced elsewhere (cd infra && source .venv/bin/activate,
-# cd backend && source .venv/bin/activate, cd frontend && npm run dev,
-# and `agentcore deploy`'s own `tsc` build of agentcore/cdk) but nothing
-# anywhere created any of the four. Idempotent -- safe to re-run.
+# CDK deploy can run, and everything `make dev` needs afterward. On this
+# branch, `agentcore/` doesn't exist yet at this point -- WALKTHROUGH.md's
+# Phase 0 creates it (via `agentcore create`) and installs its own
+# `agentcore/cdk/node_modules` there directly, since that directory isn't
+# here for this script to touch yet. Idempotent -- safe to re-run.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -32,10 +29,6 @@ fi
 infra/.venv/bin/pip install --quiet --upgrade pip
 infra/.venv/bin/pip install --quiet -r infra/requirements.txt
 echo "infra/.venv ready."
-
-echo "Installing agentcore/cdk/node_modules (npm) -- needed for agentcore deploy's own tsc build..."
-(cd agentcore/cdk && npm install --silent)
-echo "agentcore/cdk/node_modules ready."
 
 echo "Setting up backend/.venv (FastAPI app deps)..."
 if [ ! -x backend/.venv/bin/pip ]; then
