@@ -298,7 +298,7 @@ aws sts get-caller-identity</code></pre>
         <div class="step">
           <div class="step-head"><input type="checkbox" class="step-check" data-id="bootstrap"><span class="step-num">Bootstrap</span><span class="step-title">Pick your workshop ID and deploy the baseline infrastructure</span></div>
           <div class="step-body">
-            <p>This AWS account is shared with every other participant. Two values keep your resources from colliding with theirs: a <strong>WORKSHOP_ID</strong> (a short, lowercase, letters-and-digits name, unique to you, must start with a letter, for example your initials plus a number) and a <strong>WORKSHOP_SECRET</strong> (any string you pick, used only to derive your two test users' passwords later, so nobody has to hand you a password). Nothing in this guide will work until both are exported in this terminal.</p>
+            <p>You may or may not be the only person deploying into this AWS account. Two values keep your resources from colliding with anyone else's, if it turns out you are sharing: a <strong>WORKSHOP_ID</strong> (a short, lowercase, letters-and-digits name, unique to you, must start with a letter, for example your initials plus a number) and a <strong>WORKSHOP_SECRET</strong> (any string you pick, used only to derive your two test users' passwords later, so nobody has to hand you a password). Namespacing everything with your <code>WORKSHOP_ID</code> costs nothing even if you end up with the account to yourself, so do it either way. Nothing in this guide will work until both are exported in this terminal.</p>
             <div class="fill-in">
               <span class="tag">Fill in</span>
               <p>Replace <code>&lt;your workshop id&gt;</code> and <code>&lt;your workshop secret&gt;</code> with values you pick yourself, and remember them exactly. You will re-export <code>WORKSHOP_ID</code> in every new terminal you open for the rest of this guide, and re-type the secret later when you compute your login password.</p>
@@ -387,14 +387,14 @@ make bootstrap WORKSHOP_ID=$WORKSHOP_ID WORKSHOP_SECRET=$WORKSHOP_SECRET</code><
         </table>
         <div class="note">These two exist as plain Lambda functions here. The Gateway/target wiring that turns them into MCP tools happens later, by hand, in <code>agentcore/agentcore.json</code> (Phases 1 and 2), not in this stack.</div>
 
-        <h3 style="font-size:16px; margin:26px 0 10px;">Observability <span style="color:var(--muted); font-weight:400; font-size:13px;">&mdash; one account-wide setting, not per-participant</span></h3>
+        <h3 style="font-size:16px; margin:26px 0 10px;">Observability <span style="color:var(--muted); font-weight:400; font-size:13px;">&mdash; one account-wide setting, not per-WORKSHOP_ID</span></h3>
         <table class="tbl">
           <thead><tr><th style="width:26%;">Resource</th><th style="width:42%;">Purpose</th><th>Used by</th></tr></thead>
           <tbody>
             <tr><td>CloudWatch Transaction Search (account-level)</td><td>Makes AgentCore traces (model calls, memory ops, Gateway/tool calls, Browser and Code Interpreter sessions) queryable in the GenAI Observability dashboard, with zero instrumentation code.</td><td>Every harness invocation, from your first deploy on</td></tr>
           </tbody>
         </table>
-        <div class="note">One-time and idempotent. Only the first participant in a shared account actually creates it, this stack checks first and skips itself if it is already active.</div>
+        <div class="note">One-time and idempotent. Only the first <code>cdk deploy</code> in the account actually creates it, this stack checks first and skips itself if it is already active. If you have the account to yourself, that first deploy is simply yours.</div>
       </section>
 
       <section id="concepts">

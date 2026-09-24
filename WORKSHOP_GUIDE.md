@@ -24,10 +24,11 @@ export WORKSHOP_ID=<your workshop id>
 export AWS_REGION=us-west-2
 ```
 
-Every resource name you create below **must include your `WORKSHOP_ID`** — this AWS account is shared with every
-other participant, and physical resource names (Gateway names, Harness names, the IAM Roles AgentCore creates for
-them) are not automatically namespaced. `investorAgent` will collide with someone else's `investorAgent`;
-`investorAgent_$WORKSHOP_ID` won't.
+Every resource name you create below **must include your `WORKSHOP_ID`** — you may or may not be the only person
+deploying into this AWS account, and physical resource names (Gateway names, Harness names, the IAM Roles AgentCore
+creates for them) are not automatically namespaced. If someone else is deploying into the same account,
+`investorAgent` will collide with their `investorAgent`; `investorAgent_$WORKSHOP_ID` won't. Namespacing everything
+this way costs nothing even if you turn out to have the account to yourself, so do it regardless.
 
 ## What you already have
 
@@ -86,14 +87,14 @@ each resource is for before you start wiring Gateways to it.
 These two exist as plain Lambda functions here — the Gateway/target wiring that turns them into MCP tools happens
 later, by hand, in `agentcore/agentcore.json` (Phases 1 and 2), not in this stack.
 
-**Observability** — one account-wide setting, not per-participant.
+**Observability** — one account-wide setting, not per-`WORKSHOP_ID`.
 
 | Resource | Purpose | Used by |
 | --- | --- | --- |
 | CloudWatch Transaction Search (account-level) | Makes AgentCore traces (model calls, memory ops, Gateway/tool calls, Browser and Code Interpreter sessions) queryable in the GenAI Observability dashboard, with zero instrumentation code. | Every harness invocation, from your first deploy on |
 
-One-time and idempotent — only the first participant in a shared account actually creates it; this stack checks
-first and skips itself if it's already active.
+One-time and idempotent — only the first `cdk deploy` in the account actually creates it; this stack checks first
+and skips itself if it's already active. If you have the account to yourself, that first deploy is simply yours.
 
 ---
 
